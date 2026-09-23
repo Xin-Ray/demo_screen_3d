@@ -39,7 +39,7 @@
     <label for="target-size">Target size <output id="target-size-value">12 cm</output></label>
     <input id="target-size" type="range" min="4" max="30" step="1" value="12">
     <label for="replica-depth">Replica centre, behind seam <output id="replica-depth-value">10 cm</output></label>
-    <input id="replica-depth" type="range" min="-12" max="60" step="1" value="10">
+    <input id="replica-depth" type="range" min="-12" max="150" step="1" value="10">
     <label class="check"><input id="show-anchors" type="checkbox" checked> Screen-plane anchors (must never move)</label>
     <label class="check"><input id="show-seam" type="checkbox" checked> Inner-edge seam ticks</label>
     <p class="hint">Follow the progression: cube → sphere → rod → comb → robot. Nothing else is in the scene — no room, no props, no background.</p>
@@ -59,6 +59,12 @@
     </select>
     <p class="hint">A sweep is a self-check of the maths, not a viewing mode. Anchors must stay pinned to the glass while the target slides.</p>
 
+    <h3>2b · Reference eye view</h3>
+    <label class="check"><input id="reference-view" type="checkbox"> Show what a camera at the eye should photograph</label>
+    <label for="reference-fov">Camera horizontal field of view <output id="reference-fov-value">60°</output></label>
+    <input id="reference-fov" type="range" min="25" max="110" step="1" value="60">
+    <p class="hint">Off-axis projection means the two panels together reproduce, at the eye, the same image as looking straight at the virtual scene. So this single ordinary perspective view IS the correct reference. Put a camera at the entered eye position, match its field of view here, photograph the real corner, and compare the two pictures. The dark band is the strip the bezels legitimately hide; the panel outlines show where the glass edges should fall.</p>
+
     <h3>3 · Physical panels</h3>
     <label for="angle">Corner angle <output id="angle-value">90°</output></label>
     <input id="angle" type="range" min="60" max="120" step="0.5" value="90">
@@ -77,6 +83,11 @@
       <input id="left-pixels" type="number" min="320" max="16000" step="1" value="1920">
       <input id="right-pixels" type="number" min="320" max="16000" step="1" value="1920">
     </div>
+    <label for="seam-gap">Edge to hinge, per panel <output id="seam-gap-value">8.0 mm</output></label>
+    <input id="seam-gap" type="range" min="0" max="25" step="0.1" value="8">
+    <label class="check"><input id="link-panels" type="checkbox" checked> Both panels share this value</label>
+    <div class="telemetry-line">Hidden behind the bezels, at the replica depth <output id="hidden-width">—</output></div>
+    <p class="hint">Drag this while watching the seam-crossing rod and stop when the kink disappears — nulling beats measuring here. The hidden strip is correct and must never be closed by sliding the images toward each other.</p>
     <label for="measured-chord">Tape check: outer edge → outer edge (cm)</label>
     <input id="measured-chord" type="number" min="0" max="400" step="0.1" value="0">
     <p class="hint">Measure the straight line between the two far edges of the active areas. It is the only entry that can catch a wrong corner angle; 0 disables the check.</p>

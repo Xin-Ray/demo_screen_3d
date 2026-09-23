@@ -26,6 +26,17 @@ layers, the acceptance thresholds and the negative controls. Its headline result
 - **Eye position** dominates whole-scene error but barely affects seam continuity, so a broken corner
   is almost never a seating or head-tracking problem.
 
+`OPERATION.zh.md` is the Chinese operator guide: what every control does, the test
+procedure and a results template. `.claude/skills/demo_3d_testing/` packages the same
+protocol as a skill, so a Claude session opened on this repository can run the
+calibration with you directly.
+
+A **reference eye view** renders what a camera placed at the entered eye position should
+photograph — an ordinary perspective view, since off-axis projection is defined by the
+property that the two panels reproduce that image at the eye. Compare it against a real
+photograph taken from that point; comparing two renders on screen proves nothing the
+numeric checks do not already prove to 1e-12 m.
+
 Run `node calibrate.test.cjs` with Node 18+. It needs no network and no CDN: geometry, matrices, seam
 registration, the parallax law and four known-wrong configurations, including the two-ordinary-cameras
 approach, the seam-overlap shift and the 75% scene follow.

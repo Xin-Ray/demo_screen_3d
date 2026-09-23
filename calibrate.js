@@ -19,7 +19,8 @@
     eye: { x: 0, y: 0, z: .45 },
     measuredChord: 0, near: .005, far: 10,
     target: 'cube', size: .12, replicaDepth: -.1,
-    anchors: true, seamTicks: true, autoSplit: true, split: .5, sweep: 'off'
+    anchors: true, seamTicks: true, autoSplit: true, split: .5, sweep: 'off', linkPanels: true,
+    referenceView: false, referenceFov: 60
   };
   let sweepOffset = { x: 0, y: 0, z: 0 };
   let channel, lastMessage = 0, liveBinding = 0, signature = '';
@@ -124,6 +125,40 @@
     }
   }
 
+  /* The reference view. Off-axis projection is defined by the property that the
+     two panels reproduce, at the eye, the image of looking straight at the scene.
+     So an ordinary perspective camera at the eye renders exactly what a camera
+     placed there should photograph — the target for a real photograph, not
+     another render to compare renders against. */
+  const referenceCamera = new THREE.PerspectiveCamera(50, 1, .005, 20);
+  const bezelMask = new THREE.Mesh(new THREE.BufferGeometry(),
+    new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: .92, side: THREE.DoubleSide }));
+  bezelMask.name = 'bezel-mask'; bezelMask.visible = false; scene.add(bezelMask);
+  function updateBezelMask() {
+    const screens = V.screens(state);
+    // The hidden wedge is bounded by the rays through the two inner edges, so a
+    // quad on those four physical corners subtends exactly the hidden strip.
+    const corners = [V.uvToWorld(screens[0], 1, 0), V.uvToWorld(screens[0], 1, 1),
+      V.uvToWorld(screens[1], 0, 0), V.uvToWorld(screens[1], 0, 1)];
+    const points = [corners[0], corners[1], corners[2], corners[1], corners[3], corners[2]]
+      .map(point => new THREE.Vector3(...point));
+    bezelMask.geometry.dispose();
+    bezelMask.geometry = new THREE.BufferGeometry().setFromPoints(points);
+  }
+  function renderReference(eye) {
+    const aspect = innerWidth/innerHeight;
+    const horizontal = state.referenceFov*Math.PI/180;
+    referenceCamera.fov = 2*Math.atan(Math.tan(horizontal/2)/aspect)*180/Math.PI;
+    referenceCamera.aspect = aspect;
+    referenceCamera.updateProjectionMatrix();
+    referenceCamera.position.set(eye.x, eye.y, eye.z);
+    referenceCamera.lookAt(0, eye.y, -1);
+    bezelMask.visible = true;
+    renderer.setViewport(0, 0, innerWidth, innerHeight);
+    renderer.setScissor(0, 0, innerWidth, innerHeight);
+    renderer.render(scene, referenceCamera);
+    bezelMask.visible = false;
+  }
   const basisMatrix = new THREE.Matrix4();
   // The renderer is driven by the very matrices the verifier checks.
   function applyCamera(camera, screen, eye) {
@@ -224,7 +259,7 @@
   function refresh() {
     const next = JSON.stringify([state.angleDeg, state.left, state.right, state.target, state.size,
       state.replicaDepth, state.anchors, state.seamTicks]);
-    if (next !== signature) { signature = next; buildAnchors(); buildTargets(); }
+    if (next !== signature) { signature = next; buildAnchors(); buildTargets(); updateBezelMask(); }
     if (isDisplay) return;
     const report = V.runAll(state);
     const checks = report.checks.concat([viewportCheck(), bindingCheck()]);
@@ -235,6 +270,8 @@
       ? `${failed.length} check(s) failing: ${failed.map(check => check.id).join(', ')}.`
       : 'All checks pass. Now measure the panels with a ruler — the maths cannot see your room.';
     $('footer-note').textContent = `eye ${(state.eye.x*100).toFixed(1)}, ${(state.eye.y*100).toFixed(1)}, ${(state.eye.z*100).toFixed(1)} cm`;
+    const hiddenNow = V.seamGap(state, state.replicaDepth);
+    $('hidden-width').textContent = hiddenNow === null ? '—' : `${(hiddenNow*1000).toFixed(1)} mm of world`;
     const dx = 130 + state.eye.x*180, dy = 20 + state.eye.z*146;
     $('eye-dot').setAttribute('cx', dx); $('eye-dot').setAttribute('cy', dy);
     $('sightline').setAttribute('d', `M${dx} ${dy} L130 20`);
@@ -248,6 +285,17 @@
     el.oninput = () => { apply(Number(el.value)); out.textContent = format(Number(el.value)); refresh(); };
     out.textContent = format(Number(el.value));
   };
+  // One control drives the hidden wedge: nulling it against the rod is the
+  // practical calibration, so both panels move together unless unlinked.
+  function setBezel(metres, only) {
+    for (const name of only ? [only] : ['left', 'right']) state[name].bezel = metres;
+    const show = (id, value) => { const el = $(id); if (el && document.activeElement !== el) el.value = value; };
+    show('left-bezel', (state.left.bezel*100).toFixed(2));
+    show('right-bezel', (state.right.bezel*100).toFixed(2));
+    show('seam-gap', (state.left.bezel*1000).toFixed(1));
+    const output = $('seam-gap-value');
+    if (output) output.textContent = `${(state.left.bezel*1000).toFixed(1)} mm`;
+  }
   function bindControls() {
     range('target-size', 'target-size-value', v => state.size = v/100, v => `${v} cm`);
     range('replica-depth', 'replica-depth-value', v => state.replicaDepth = -v/100,
@@ -265,9 +313,21 @@
     for (const name of ['left', 'right']) {
       number(`${name}-width`, v => state[name].width = v/100);
       number(`${name}-height`, v => state[name].height = v/100);
-      number(`${name}-bezel`, v => state[name].bezel = v/100);
+      number(`${name}-bezel`, v => setBezel(v/100, state.linkPanels ? null : name));
       number(`${name}-pixels`, v => state[name].pixels = v);
     }
+    range('reference-fov', 'reference-fov-value', v => state.referenceFov = v, v => `${v}°`);
+    $('reference-view').onchange = () => {
+      state.referenceView = $('reference-view').checked;
+      document.body.classList.toggle('reference', state.referenceView);
+      refresh();
+    };
+    range('seam-gap', 'seam-gap-value', v => setBezel(v/1000, state.linkPanels ? null : 'left'), v => `${v.toFixed(1)} mm`);
+    $('link-panels').onchange = () => {
+      state.linkPanels = $('link-panels').checked;
+      if (state.linkPanels) setBezel(state.left.bezel, null);
+      refresh();
+    };
     number('measured-chord', v => state.measuredChord = v/100);
     $('reset').onclick = () => location.reload();
     $('open-left').onclick = () => open(`${location.pathname}?view=left`, 'calibrate-left', 'width=900,height=600');
@@ -306,12 +366,13 @@
   addEventListener('beforeunload', () => { clearInterval(timer); channel && channel.close(); });
   function resize() { renderer.setSize(innerWidth, innerHeight); refresh(); }
   addEventListener('resize', resize);
-  buildAnchors(); buildTargets(); resize(); refresh();
+  buildAnchors(); buildTargets(); updateBezelMask(); resize(); refresh();
 
   function animate(now) {
     requestAnimationFrame(animate);
     updateSweep(now);
     const eye = renderEye(), screens = V.screens(state), fraction = splitFraction();
+    if (state.referenceView && !isDisplay) return renderReference(eye);
     const split = Math.round(innerWidth*fraction);
     let frameBinding = 0;
     for (let i = 0; i < 2; i++) {

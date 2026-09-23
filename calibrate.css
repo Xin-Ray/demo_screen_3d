@@ -27,6 +27,7 @@ select, input[type=number] { width: 100%; margin: 4px 0; }
 .grid label { margin: 0; font-size: 11px; color: #adbec8; }
 .grid .col { font-size: 10px; letter-spacing: .12em; color: #76ddcd; text-align: center; }
 .grid input { margin: 0; }
+.telemetry-line { padding: 6px 9px; margin: 8px 0; background: #071018; border-radius: 6px; font-size: 11px; color: #adbec8; }
 #checks { font-size: 11px; }
 .row { display: flex; gap: 8px; align-items: baseline; padding: 5px 0; border-bottom: 1px solid #17252f; }
 .row b { flex: 1; font-weight: 400; color: #cfdde4; }
@@ -50,6 +51,7 @@ td.n, th.n { text-align: right; }
 #display-tools { position: fixed; top: 12px; left: 12px; padding: 8px 12px; background: #0d1a24ee; border-radius: 8px; }
 #display-tools span { margin-right: 12px; } #connection { font-size: 11px; color: #adbec8; }
 #presentation-tools { position: fixed; left: 12px; top: 12px; opacity: .2; } #presentation-tools:hover, #presentation-tools:focus-within { opacity: 1; }
+body.reference #seam-marker, body.reference .screen-label { display: none; }
 body.display #controls, body.display .screen-label, body.display #footer, body.display #seam-marker { display: none; }
 body.immersive #controls, body.immersive .screen-label, body.immersive #footer, body.immersive #seam-marker { display: none; }
 :fullscreen #display-tools { display: none; }
