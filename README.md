@@ -5,6 +5,30 @@ Serve this folder with `python -m http.server 8000` (or `bash run.sh`), then ope
 - Original: http://localhost:8000/
 - Concave 90° version: http://localhost:8000/concave.html
 - Portrait concave room: http://localhost:8000/concave-room.html (also linked from the index)
+- Fixed-viewpoint calibration: http://localhost:8000/calibrate.html (also linked from the index)
+
+## Fixed-viewpoint calibration
+
+`calibrate.html` is the pre-tracking rig: one shared scene, one replica root, one manually placed
+eye, two off-axis projections, a black background and a single test object. No webcam, no room, no
+seam-overlap control. Use it to establish that the corner geometry is right before any of the other
+pages are worth judging.
+
+The page does not ask you to decide whether it looks correct. It prints the numbers you can check:
+where each on-glass cross must sit in millimetres, how far a marker at a given depth must slide for a
+60 mm head rise, how much world the bezels legitimately hide, and what each measuring slip costs in
+arcminutes of whole-scene shift and of seam step. `CALIBRATION.md` is the protocol — six measurement
+layers, the acceptance thresholds and the negative controls. Its headline results:
+
+- The **window split** is the most damaging input by a factor of five; use two fullscreen windows
+  (Open left / Open right) so the error is structurally zero rather than merely small.
+- The **gap from each active area to the hinge** is the second, and is usually not measured at all.
+- **Eye position** dominates whole-scene error but barely affects seam continuity, so a broken corner
+  is almost never a seating or head-tracking problem.
+
+Run `node calibrate.test.cjs` with Node 18+. It needs no network and no CDN: geometry, matrices, seam
+registration, the parallax law and four known-wrong configurations, including the two-ordinary-cameras
+approach, the seam-overlap shift and the 75% scene follow.
 
 ## Concave setup
 
