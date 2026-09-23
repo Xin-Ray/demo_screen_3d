@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Fixed-viewpoint calibration · 90° corner</title>
+  <link rel="stylesheet" href="calibrate.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script defer src="calibrate-verify.js"></script>
+  <script defer src="calibrate.js"></script>
+</head>
+<body>
+  <main id="stage" aria-label="One shared 3D scene projected onto two monitors that meet at 90 degrees"></main>
+  <div id="seam-marker" aria-hidden="true"></div>
+  <div class="screen-label left">LEFT PANEL</div><div class="screen-label right">RIGHT PANEL</div>
+  <details id="controls" open>
+    <summary>Fixed-viewpoint calibration <span>STAGES 1–9 · NO HEAD TRACKING</span></summary>
+    <p class="intro">One scene, one replica root, one fixed eye, two off-axis projections. Measure before you judge: every number below is something you can check with a ruler.</p>
+    <div class="actions"><button id="hide-setup">Hide setup · H</button><button id="reset">Reset</button></div>
+
+    <svg id="diagram" viewBox="0 0 260 120" role="img" aria-label="Top view of the two panels and the fixed eye">
+      <path d="M55 95 L130 20 L205 95" fill="none" stroke="#76ddcd" stroke-width="5" stroke-linecap="round"/>
+      <path id="sightline" d="M130 86 L130 20" stroke="#769599" stroke-dasharray="3 4"/>
+      <circle id="eye-dot" cx="130" cy="86" r="6" fill="#ffbc70"/>
+      <rect id="replica-dot" x="125" y="30" width="10" height="10" rx="2" fill="#ff8f6b"/>
+      <text x="13" y="30">TOP VIEW</text><text x="148" y="68">90°</text><text x="140" y="108">FIXED EYE</text>
+    </svg>
+
+    <h3>1 · Target</h3>
+    <label for="target">Calibration target</label>
+    <select id="target">
+      <option value="cube">Cube — start here</option>
+      <option value="sphere">Sphere</option>
+      <option value="rod">Seam-crossing rod</option>
+      <option value="comb">Depth comb — parallax measurement</option>
+      <option value="robot">Robot</option>
+      <option value="none">Nothing (anchors only)</option>
+    </select>
+    <label for="target-size">Target size <output id="target-size-value">12 cm</output></label>
+    <input id="target-size" type="range" min="4" max="30" step="1" value="12">
+    <label for="replica-depth">Replica centre, behind seam <output id="replica-depth-value">10 cm</output></label>
+    <input id="replica-depth" type="range" min="-12" max="150" step="1" value="10">
+    <label class="check"><input id="show-anchors" type="checkbox" checked> Screen-plane anchors (must never move)</label>
+    <label class="check"><input id="show-seam" type="checkbox" checked> Inner-edge seam ticks</label>
+    <p class="hint">Follow the progression: cube → sphere → rod → comb → robot. Nothing else is in the scene — no room, no props, no background.</p>
+
+    <h3>2 · Fixed eye</h3>
+    <label for="eye-z">Eye in front of seam, along the bisector <output id="eye-z-value">45 cm</output></label>
+    <input id="eye-z" type="range" min="25" max="100" step="0.5" value="45">
+    <label for="eye-x">Eye sideways from the bisector <output id="eye-x-value">0 cm</output></label>
+    <input id="eye-x" type="range" min="-15" max="15" step="0.5" value="0">
+    <label for="eye-y">Eye above screen centre <output id="eye-y-value">0 cm</output></label>
+    <input id="eye-y" type="range" min="-15" max="15" step="0.5" value="0">
+    <label for="sweep">Automatic eye sweep</label>
+    <select id="sweep">
+      <option value="off">Off — fixed viewpoint (use this to calibrate)</option>
+      <option value="vertical">Vertical ±6 cm (in-plane for both panels)</option>
+      <option value="horizontal">Horizontal ±6 cm</option>
+    </select>
+    <p class="hint">A sweep is a self-check of the maths, not a viewing mode. Anchors must stay pinned to the glass while the target slides.</p>
+
+    <h3>2b · Reference eye view</h3>
+    <label class="check"><input id="reference-view" type="checkbox"> Show what a camera at the eye should photograph</label>
+    <label for="reference-fov">Camera horizontal field of view <output id="reference-fov-value">60°</output></label>
+    <input id="reference-fov" type="range" min="25" max="110" step="1" value="60">
+    <p class="hint">Off-axis projection means the two panels together reproduce, at the eye, the same image as looking straight at the virtual scene. So this single ordinary perspective view IS the correct reference. Put a camera at the entered eye position, match its field of view here, photograph the real corner, and compare the two pictures. The dark band is the strip the bezels legitimately hide; the panel outlines show where the glass edges should fall.</p>
+
+    <h3>3 · Physical panels</h3>
+    <label for="angle">Corner angle <output id="angle-value">90°</output></label>
+    <input id="angle" type="range" min="60" max="120" step="0.5" value="90">
+    <div class="grid">
+      <span></span><span class="col">LEFT</span><span class="col">RIGHT</span>
+      <label for="left-width">Active width (cm)</label>
+      <input id="left-width" type="number" min="5" max="200" step="0.1" value="53.1">
+      <input id="right-width" type="number" min="5" max="200" step="0.1" value="53.1">
+      <label for="left-height">Active height (cm)</label>
+      <input id="left-height" type="number" min="5" max="200" step="0.1" value="29.9">
+      <input id="right-height" type="number" min="5" max="200" step="0.1" value="29.9">
+      <label for="left-bezel">Edge to hinge (cm)</label>
+      <input id="left-bezel" type="number" min="0" max="10" step="0.05" value="0.8">
+      <input id="right-bezel" type="number" min="0" max="10" step="0.05" value="0.8">
+      <label for="left-pixels">Horizontal pixels</label>
+      <input id="left-pixels" type="number" min="320" max="16000" step="1" value="1920">
+      <input id="right-pixels" type="number" min="320" max="16000" step="1" value="1920">
+    </div>
+    <label for="seam-gap">Edge to hinge, per panel <output id="seam-gap-value">8.0 mm</output></label>
+    <input id="seam-gap" type="range" min="0" max="25" step="0.1" value="8">
+    <label class="check"><input id="link-panels" type="checkbox" checked> Both panels share this value</label>
+    <div class="telemetry-line">Hidden behind the bezels, at the replica depth <output id="hidden-width">—</output></div>
+    <p class="hint">Drag this while watching the seam-crossing rod and stop when the kink disappears — nulling beats measuring here. The hidden strip is correct and must never be closed by sliding the images toward each other.</p>
+    <label for="measured-chord">Tape check: outer edge → outer edge (cm)</label>
+    <input id="measured-chord" type="number" min="0" max="400" step="0.1" value="0">
+    <p class="hint">Measure the straight line between the two far edges of the active areas. It is the only entry that can catch a wrong corner angle; 0 disables the check.</p>
+
+    <h3>4 · Window split</h3>
+    <label class="check"><input id="auto-split" type="checkbox" checked> Split at the real pixel boundary</label>
+    <label for="split">Manual seam alignment <output id="split-value">50%</output></label>
+    <input id="split" type="range" min="20" max="80" step="0.05" value="50">
+    <p class="hint">Stretch this window across both monitors edge to edge, or use separate windows below. No seam-overlap slider exists here on purpose: shifting the images hides geometry errors instead of fixing them.</p>
+    <div class="actions"><button id="open-left">Open left</button><button id="open-right">Open right</button></div>
+
+    <h3>5 · Verification</h3>
+    <div id="checks" aria-live="polite"></div>
+    <div id="predictions"></div>
+    <p id="status" role="status"></p>
+    <a class="original" href="index.html">← all demos</a>
+  </details>
+  <div id="presentation-tools" hidden><button id="show-setup">Show setup · H</button></div>
+  <div id="display-tools" hidden><span id="display-title">PANEL</span><button id="fullscreen">Fullscreen</button><span id="connection"></span></div>
+  <div id="footer">FIXED VIEWPOINT · OFF-AXIS PROJECTION<span id="footer-note"></span></div>
+</body>
+</html>
