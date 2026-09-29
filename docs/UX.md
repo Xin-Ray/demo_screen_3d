@@ -36,7 +36,7 @@ position the UI needs to describe in detail.
 | Camera | Where | Job |
 |---|---|---|
 | **Tracking camera** | Fixed on top of the seam, facing the viewer | Eye tracking, live, during the experience. |
-| **Calibration camera** | Handheld or on a tripod, 1–2 m in front of the setup, used only during calibration | Measures where the tracking camera is and which way it faces (plus the screen pair's angle, gap and offset). |
+| **Calibration camera** (optional) | A second USB webcam, handheld or on a tripod, 1–2 m in front of the setup, used only during calibration | Measures where the tracking camera is and which way it faces (plus the screen pair's angle, gap and offset). |
 
 **Screens:** always the same model and size. They are described *together*
 as a pair by their relative position, not as two independently placed
@@ -173,8 +173,10 @@ for this.
 - Status card: last calibration time, angle, gap, screen size, webcam state.
 - Two large buttons:
   - **Manual measurement**: "Measure with a tape and type the numbers."
-  - **Camera auto-calibration**: "Use a second camera to measure the
-    screens automatically."
+  - **Camera auto-calibration** (optional, shows a *Preview* badge): "Use a
+    second camera to measure the screens automatically."
+- **Manual measurement is the primary path**, and it alone is enough to run
+  the full experience.
 - Footer: **Apply & start experience**.
 
 ### 4.2 Manual measurement
@@ -199,43 +201,44 @@ Sections, top to bottom:
 
 Footer: **Apply & start experience**.
 
-### 4.3 Camera auto-calibration (calibration camera)
+### 4.3 Camera auto-calibration (optional — placeholder in v2.0)
 
-Goal: find the **tracking camera's exact position and facing angle**
-relative to the screens, and measure the screen pair, without a tape.
+Camera calibration is **optional**. Manual measurement (§4.2) is always
+enough. In v2.0 this view is a **placeholder with real UI**. The flow can be
+clicked through, but the solver isn't implemented yet, and it never
+overwrites manual values without the user confirming.
 
-1. **Choose the calibration camera:** a second USB webcam on the same PC
-   (a phone with a pairing link is optional later). It's selected separately
-   from the tracking camera, so the two are never confused.
-2. **Show markers:** the app shows a **marker pattern** (ChArUco board)
-   full-screen on *both* monitors at once. A small printed marker board is
-   also attached to, or held flush against, the front of the **tracking
-   camera**.
-3. **Capture:** the user holds the calibration camera about 1–2 m in front
-   so both screens *and* the tracking camera are in view, and takes 5–10
-   captures from slightly different positions. A progress bar counts good
-   captures.
-4. **Solve:** from the markers the app estimates:
-   - each screen plane → inside angle, gap and vertical offset (width and
-     height are checked against the saved values);
-   - the **tracking camera pose**: height above the screens, forward
-     offset, yaw and tilt.
-5. **Cross-check (optional):** the tracking camera also briefly looks at a
-   marker in the calibration camera's view to confirm its field of view and
-   facing.
-6. **Review:** results appear **in the same fields as the Manual page**,
-   each with a confidence value. The mini-view immediately redraws the
-   solved screens and tracking camera so the user can see whether they look
-   right. Any value can be edited.
-7. **Eye-distance calibration:** the same step as on the Manual page.
+Intended method (for a later version): a printed **shared calibration
+board**, with nothing attached to the tracking camera.
 
-Footer: **Apply & start experience**.
+- The user holds a flat printed ChArUco board (A4/A3, printed at 100%)
+  about 1 m in front of the screens.
+- The **tracking camera** sees the board, which gives its pose relative to
+  the board, including its real field of view.
+- The **calibration camera** sees the board *and* the marker patterns shown
+  on both screens, which gives the screen pair's pose relative to the board.
+- Chaining the two gives the tracking camera's position and facing angle
+  relative to the screens, plus the inside angle, gap and offset.
 
-Only the tracking camera runs during the experience. The calibration
-camera is released after Apply.
+**v2.0 placeholder UI**, top to bottom:
 
-Build order: Manual measurement is phase 1 and camera auto-calibration is
-phase 2. Both write to the same saved profile.
+1. A banner: "Preview — automatic calibration is not available yet. Use
+   Manual measurement." with a **Go to Manual measurement** link.
+2. **Calibration camera** dropdown listing USB cameras, excluding the
+   tracking camera, and a live preview of the selected camera.
+3. **Board settings:** square size (mm), board size (A4/A3), and a
+   **Download board PDF** button (disabled in v2.0).
+4. **Show screen markers** toggle (disabled in v2.0).
+5. **Capture** button and a "0 / 8 good captures" progress bar (disabled
+   in v2.0).
+6. **Results table** with the same fields as Manual (angle, gap, offset,
+   camera height / forward / yaw / tilt / FOV) and a confidence column.
+   These show "—" until a solver exists. A **Copy to Manual** button is
+   disabled until there are results.
+7. The same eye-distance calibration step as the Manual page.
+
+Footer: **Apply & start experience**. It uses the current saved/manual
+values.
 
 ## 5. Experience view
 
@@ -289,18 +292,18 @@ edges, the screen geometry is the problem.
 | `concave-geometry.js` | `screens(width, height)` becomes `screens({width, height, angle, gap, vOffset})`. `project()` is unchanged. |
 | `concave-room.js` | Remove the 75% room follow. Remove the display-window / BroadcastChannel mode. Add a profile load/save step and the debug mini-view. |
 | `concave-room.html` | Restructure the controls into the foldable drawer with Home / Manual / Camera views and a sticky **Apply** footer. Remove Open left/right. |
-| New | `calibration-camera.js` (phase 2): calibration-camera selection, ChArUco detection via OpenCV.js, screen-plane and tracking-camera pose solving. |
+| New | `calibration-camera.js`: v2.0 = placeholder UI plus calibration-camera selection and preview only. Later: ChArUco detection via OpenCV.js and the shared-board pose solver. |
 | Layout | Left 20% column on the left screen: setup panel above, mini-view below. |
-| Versioning | The current demos are tagged `v1.0`. v2.0 turns `concave-room.html` into the single app. |
+| Versioning | The current demos are tagged `v1.0` and stay in the repo. v2.0 turns `concave-room.html` into the single app. |
 | Tests | Extend `concave-room.test.cjs`: corner positions for several angles (60°–180°) and gaps; a flat 180°, 0-gap pair must match a single wide screen. |
 
 ---
 
-## 7. Open decisions
+## 7. Decisions
 
-1. After v2.0 ships, should the v1.0 demo files (`index.html`, `concave.html`)
-   stay in the repo, or live only at the `v1.0` tag?
-2. How is the marker attached to the tracking camera: a small printed card
-   clipped on, or a marker shown on screen right below the camera?
-3. Calibration camera: is a second USB webcam enough, or is phone support
-   needed? A phone needs HTTPS and a pairing link.
+1. The v1.0 demo files (`index.html`, `concave.html`) **stay in the repo**.
+2. Camera calibration is **optional**. It is a placeholder UI in v2.0, and
+   manual input is the primary path.
+3. The calibration camera is a **second USB webcam** (no phone support).
+4. Later method: a **shared printed board** seen by both cameras. No marker
+   is attached to the tracking camera.
