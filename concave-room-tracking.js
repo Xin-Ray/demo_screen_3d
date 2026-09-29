@@ -39,9 +39,9 @@
       && Math.max(Math.abs(eye.x),Math.abs(eye.y),Math.abs(eye.z)) < 10
       && eye.z-Math.abs(eye.x) >= .03;
   }
-  function smoothEye(current, target, seconds) {
-    // 180 ms response, independent of inference/render rate. Ignore sub-2 mm noise.
-    const alpha = 1-Math.exp(-Math.max(0, Math.min(seconds,.1))/.18);
+  function smoothEye(current, target, seconds, response = .18) {
+    // Time-based response (default 180 ms), independent of inference/render rate. Ignore sub-2 mm noise.
+    const alpha = 1-Math.exp(-Math.max(0, Math.min(seconds,.1))/response);
     const next = {};
     for (const axis of ['x','y','z']) {
       const delta = target[axis]-current[axis];
