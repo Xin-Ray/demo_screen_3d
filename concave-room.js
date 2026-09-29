@@ -3,7 +3,7 @@
   const $ = id => document.getElementById(id);
   const side = new URLSearchParams(location.search).get('view');
   const isDisplay = ['left', 'right'].includes(side);
-  const state = { width: .60, height: 1.067, depth: .08, overlap: 0,
+  const state = { width: .336, height: .598, depth: .08, overlap: 0,
     eye: { x: 0, y: 0, z: 1.20 }, dancePlaying: true, danceEpoch: Date.now(), danceOffset: 0 };
   let seam = .5, channel, lastMessage = 0;
   const status = message => { $('status').textContent = message; };
@@ -109,101 +109,27 @@
     Object.assign(light.shadow.camera, {left:-reach,right:reach,top:reach,bottom:-reach,near:.01,far:reach*5});
     light.shadow.camera.updateProjectionMatrix(); light.shadow.normalBias = .001;
   }
-  // A rounded black-and-white panda, with real geometry for parallax and shadows.
+  // Panda model loaded from models/panda.glb, normalized to the old figure's size.
   const person = new THREE.Group();
   person.name = 'foreground-object'; person.userData.kind = 'panda';
   scene.add(person);
-  const bodyMaterial = new THREE.MeshStandardMaterial({ color: 0xf5f2e9, roughness: .8, metalness: .06 });
-  const jointMaterial = new THREE.MeshStandardMaterial({ color: 0x151923, roughness: .85 });
-  const faceMaterial = new THREE.MeshStandardMaterial({ color: 0x090d14, roughness: .7 });
-  const roundGeometry = new THREE.SphereGeometry(1, 24, 16);
-  function roundedPart(name, position, scale, material = bodyMaterial) {
-    const part = new THREE.Mesh(roundGeometry, material);
-    part.name = name; part.position.set(...position); part.scale.set(...scale);
-    part.castShadow = true; part.receiveShadow = true; person.add(part);
-    return part;
-  }
-  function limb(name, start, end, radius, material = jointMaterial) {
-    const a = new THREE.Vector3(...start), b = new THREE.Vector3(...end);
-    const part = new THREE.Mesh(new THREE.CylinderGeometry(radius*1.3, radius*1.5, a.distanceTo(b), 20), material);
-    part.name = name; part.position.copy(a).add(b).multiplyScalar(.5);
-    part.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0), b.sub(a).normalize());
-    part.castShadow = true; part.receiveShadow = true; person.add(part);
-  }
-  roundedPart('head', [0,.67,0], [.27,.255,.23]);
-  limb('neck', [0,.41,0], [0,.52,0], .065, jointMaterial);
-  roundedPart('torso', [0,.17,0], [.32,.34,.23]);
-  roundedPart('pelvis', [0,-.14,0], [.25,.18,.20]);
-  // Small facial landmarks distinguish the front from the back during parallax.
-  roundedPart('muzzle', [0,.60,.205], [.115,.08,.065]);
-  roundedPart('nose', [0,.635,.268], [.045,.028,.023], faceMaterial);
-  roundedPart('mouth', [0,.572,.263], [.032,.009,.008], faceMaterial);
-  const pandaFace = ['muzzle','mouth'];
-  for (const sign of [-1,1]) {
-    const sideName = sign < 0 ? 'left' : 'right';
-    const patch = roundedPart(`${sideName}-patch`, [sign*.102,.70,.207], [.076,.093,.033], jointMaterial);
-    patch.rotation.z = -sign*.32;
-    roundedPart(`${sideName}-ear`, [sign*.21,.86,-.005], [.10,.105,.065], jointMaterial);
-    roundedPart(`${sideName}-eye`, [sign*.10,.715,.239], [.025,.029,.017], faceMaterial);
-    roundedPart(`${sideName}-glint`, [sign*.10-.007,.726,.254], [.008,.009,.006]);
-    pandaFace.push(`${sideName}-patch`, `${sideName}-ear`, `${sideName}-glint`);
-    const shoulder = [sign*.255,.36,0], elbow = [sign*.34,.06,.01], wrist = [sign*.365,-.20,.045];
-    roundedPart(`${sideName}-shoulder`, shoulder, [.105,.115,.105], jointMaterial);
-    limb(`${sideName}-upper-arm`, shoulder, elbow, .065);
-    roundedPart(`${sideName}-elbow`, elbow, [.055,.055,.055], jointMaterial);
-    limb(`${sideName}-forearm`, elbow, wrist, .052);
-    roundedPart(`${sideName}-hand`, [sign*.37,-.255,.045], [.075,.09,.07], jointMaterial);
-    const hip = [sign*.115,-.21,0], knee = [sign*.135,-.49,.015], ankle = [sign*.14,-.77,0];
-    limb(`${sideName}-thigh`, hip, knee, .088);
-    roundedPart(`${sideName}-knee`, knee, [.069,.067,.067], jointMaterial);
-    limb(`${sideName}-shin`, knee, ankle, .065);
-    roundedPart(`${sideName}-foot`, [sign*.14,-.825,.055], [.105,.075,.15], jointMaterial);
-  }
-  // Reparent the existing meshes around anatomical pivots while preserving the
-  // neutral pose. All motion stays inside the foreground model's local bounds.
-  const dancer = new THREE.Group(); dancer.name = 'dance-root';
-  person.add(dancer);
-  for (const part of [...person.children]) if (part !== dancer) dancer.attach(part);
-  function joint(name, parent, position, parts) {
-    const pivot = new THREE.Group(); pivot.name = name; pivot.position.set(...position);
-    parent.add(pivot);
-    for (const part of parts) pivot.attach(person.getObjectByName(part));
-    return pivot;
-  }
-  const torsoPivot = joint('torso-pivot', dancer, [0,-.14,0], ['torso','neck','head','nose','left-eye','right-eye',...pandaFace]);
-  const headPivot = joint('head-pivot', torsoPivot, [0,.63,0], ['head','nose','left-eye','right-eye',...pandaFace]);
-  const danceJoints = [-1,1].map(sign => {
-    const name = sign < 0 ? 'left' : 'right';
-    const shoulder = joint(`${name}-shoulder-pivot`, torsoPivot, [sign*.255,.5,0],
-      ['shoulder','upper-arm','elbow','forearm','hand'].map(part => `${name}-${part}`));
-    const elbow = joint(`${name}-elbow-pivot`, shoulder, [sign*.085,-.30,.01],
-      ['elbow','forearm','hand'].map(part => `${name}-${part}`));
-    const hip = joint(`${name}-hip-pivot`, dancer, [sign*.115,-.21,0],
-      ['thigh','knee','shin','foot'].map(part => `${name}-${part}`));
-    const knee = joint(`${name}-knee-pivot`, hip, [sign*.02,-.28,.015],
-      ['knee','shin','foot'].map(part => `${name}-${part}`));
-    return {sign,shoulder,elbow,hip,knee};
-  });
-  // Seated bear pose: spread thighs forward, bend the knees slightly, and
-  // rest the left paw by the lap. These joints remain fixed during the wave.
-  dancer.position.y = -.25;
-  for (const {sign,hip,knee,shoulder,elbow} of danceJoints) {
-    hip.rotation.set(-1.48, 0, sign*.25);
-    knee.rotation.x = .28;
-    if (sign < 0) {
-      shoulder.rotation.set(-.45, 0, -.12);
-      elbow.rotation.x = -.65;
-    }
-  }
+  const PANDA_HEIGHT = 1.9;
+  if (THREE.GLTFLoader) {
+    new THREE.GLTFLoader().load('models/panda.glb', gltf => {
+      const model = gltf.scene;
+      model.traverse(node => { if (node.isMesh) { node.castShadow = true; node.receiveShadow = true; } });
+      const box = new THREE.Box3().setFromObject(model), size = box.getSize(new THREE.Vector3());
+      model.scale.setScalar(PANDA_HEIGHT/size.y);
+      model.rotation.y = -Math.PI/2; // model's nose points +x; turn it to face the viewer (+z)
+      const center = new THREE.Box3().setFromObject(model).getCenter(new THREE.Vector3());
+      model.position.sub(center);
+      person.add(model);
+    }, undefined, error => { console.error(error); status('Panda model failed to load (models/panda.glb).'); });
+  } else status('GLTFLoader unavailable. Check your connection and reload.');
   function danceTime() {
     return state.danceOffset + (state.dancePlaying ? Math.max(0, Date.now()-state.danceEpoch)/1000 : 0);
   }
   function animateDance() {
-    // Only the right arm gestures. The root, head, torso and legs stay still.
-    const wave = Math.sin(danceTime()*2.4);
-    const arm = danceJoints.find(joint => joint.sign === 1);
-    arm.shoulder.rotation.set(0, 0, .55);
-    arm.elbow.rotation.set(-1.5, 0, .18*wave);
     person.position.set(0, 0, state.depth);
     person.scale.setScalar(Math.min(state.height*.31, state.width*.48));
   }
