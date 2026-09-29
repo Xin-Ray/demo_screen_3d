@@ -123,7 +123,7 @@ where the two screens meet.
 | Visible width (each screen) | cm | 33.6 | Lit display area only, no bezel |
 | Visible height (each screen) | cm | 59.8 | Lit display area only |
 | **Inside angle** θ | ° | 90 | Angle between the two *display surfaces*, measured on the viewer side (not the monitor backs). 180° = flat. |
-| Gap at seam | cm | 1.5 | Distance from the edge of the left lit area to the edge of the right lit area, measured across the corner. Covers both bezels and any air gap. |
+| Gap at seam | cm | 1.5 | Straight-line distance from the inner edge of the left lit area to the inner edge of the right lit area (a ruler laid across the corner). Covers both bezels and any air gap. |
 | Vertical offset | cm | 0 | How much higher the right lit area sits than the left (+ = right higher). |
 | Seam position in window | % | 50 | Where the spanning window is split. 50% for two equal monitors. |
 
@@ -131,13 +131,17 @@ where the two screens meet.
 Manual page also accepts a tape measurement:
 *"Distance between the two outer lit edges, straight across (cm)"*.
 The app turns this into the angle and shows both values. The user can type
-either one and the other updates.
+either one and the other updates. With outer-edge distance D, gap g and
+width w: `sin(θ/2) = (D − g) / (2w)`.
 
 **How the app places the screens.** The seam is the vertical z-axis. The
 viewer is on +z. Each panel leans back by half the inside angle from the
 bisector, so the left panel runs along `(−sin θ/2, 0, cos θ/2)` and the
-right along `(+sin θ/2, 0, cos θ/2)`. Each lit area starts half the gap
-away from the seam. The off-axis projection math is unchanged; only the
+right along `(+sin θ/2, 0, cos θ/2)`. The corner (origin) is where the
+two display planes meet. Each lit area starts `g / (2·sin θ/2)` from the
+corner along its panel, so the straight gap between the inner edges is `g`.
+The vertical offset moves the right panel up by `+v/2` and the left down by
+`v/2`. The off-axis projection math is unchanged; only the
 corner positions change.
 
 **Gap handling.** The 3D world is continuous across the corner. The gap
@@ -185,19 +189,25 @@ Sections, top to bottom:
 
 1. **Screens:** width, height, inside angle *or* outer-edge distance, gap,
    vertical offset.
-2. **Webcam:** height, forward, tilt, FOV (yaw under *Advanced*).
-3. **Live top view and side view diagram:** the screen pair drawn to scale
-   at the entered angle and gap, with the webcam and its view cone. It
-   updates on every keystroke.
+2. **Tracking camera:** a camera dropdown (needed because a second USB
+   camera may be connected), then height, forward, tilt and FOV. Yaw and
+   left/right offset are under *Advanced*.
+3. **Live diagram:** the debug mini-view directly below the setup panel
+   (§5.1) *is* the live diagram. It redraws the screen pair to scale at the
+   entered angle and gap, with the webcam and its view cone, on every
+   keystroke. No second copy is shown.
 4. **Alignment test pattern** (toggle): replaces the scene with a grid
-   floor, a vertical pole standing exactly on the seam, and horizontal lines
-   running across both screens. When the numbers are right, the lines look
+   floor, a gridded back wall, a vertical pole on the seam line (x = 0)
+   behind the screens, and horizontal lines running across both screens. When the numbers are right, the lines look
    straight and continuous from the calibrated eye position.
 5. **Eye-distance calibration:** the live webcam preview, a slider for the
    measured eye → webcam distance, and a **Calibrate tracking** button.
    This step is the same on both setup paths.
 6. **Advanced** (collapsed): seam overlap (default 0, labelled *non-physical
-   correction*), webcam yaw, tracking smoothing.
+   correction*), webcam yaw, webcam left/right offset, and tracking
+   smoothing time (default 180 ms).
+7. **Profile:** Export JSON / Import JSON buttons, and a link to the v1.0
+   demos.
 
 Footer: **Apply & start experience**.
 
@@ -242,22 +252,27 @@ values.
 
 ## 5. Experience view
 
-- The drawer folds away and the window stays spanning both screens edge to
-  edge.
+- **Apply** saves the profile, stamps the calibration time and folds the
+  setup panel. It does *not* use browser fullscreen: Chrome's fullscreen
+  covers only one monitor. Instead the window is spanned edge to edge
+  across both monitors by `tools/span_window.py` (see README). The script
+  launches Chrome as a frameless app window and asks the window manager to
+  make it fullscreen across both monitors.
 - Eye tracking runs on the seam-top webcam and drives one eye position for
   both screen projections.
 - The whole scene responds fully and physically correctly: room, frame,
   panda and shadows.
-- Keys: **H** shows or hides the setup drawer, **D** shows or hides the
-  debug mini-view, **P** pauses motion, **R** restarts the camera.
+- Keys: **H** shows or hides the whole left column, **D** cycles the
+  mini-view between *both views*, *top only* and *side only*, **P** pauses
+  motion, **R** restarts the camera. Keys are ignored while typing in a
+  field.
 - If tracking is lost, the last view is held and a small status pill shows
   "Tracking lost: eyes not visible".
 
 ### 5.1 Debug mini-view (digital review)
 
 The lower section of the left-side 20% column (§2). It is always visible
-while the column is shown. **D** switches between the top view and the side
-view if space is tight.
+while the column is shown. **D** cycles *both → top → side*.
 
 **Top view, to scale:**
 - the two screen segments at the calibrated angle, with the gap drawn;
