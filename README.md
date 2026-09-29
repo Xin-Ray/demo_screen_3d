@@ -8,19 +8,30 @@ window into a 3D room with a floating panda.
 | Version | Status | Where |
 |---|---|---|
 | **v1.0** | Original demos: flat screen, 90° concave, portrait room (90° only). | Tag [`v1.0`](../../tree/v1.0) · details in [`docs/v1-README.md`](docs/v1-README.md) |
-| **v2.0** | In progress: one app with calibration (adjustable angle, seam gap), a fully responsive room and a debug mini-view. | Spec: [`docs/UX.md`](docs/UX.md) |
+| **v2.0** | Core app done: one app with calibration (adjustable angle, seam gap), a fully responsive room and a debug mini-view. Camera auto-calibration is a placeholder. | Spec: [`docs/UX.md`](docs/UX.md) |
 
 ## Run
 
 ```bash
-bash run.sh          # serves this folder on http://localhost:8000
+bash run.sh                        # serves this folder on http://localhost:8000
+python3 tools/span_window.py       # opens the app fullscreen across both monitors (X11)
 ```
 
-Open `http://localhost:8000/concave-room.html` in Chrome and stretch the
-window across both monitors. It needs a webcam, localhost or HTTPS, and
-internet access for the Three.js and MediaPipe CDNs.
+`tools/span_window.py` needs `python-xlib` and Google Chrome. Browser
+fullscreen covers only one monitor, so use this script instead. You can
+also open `http://localhost:8000/concave-room.html` and stretch the window
+by hand. The app needs a webcam, localhost or HTTPS, and internet access for
+the Three.js and MediaPipe CDNs.
 
-Tests (Node 18+): `node concave-room.test.cjs` and `node concave.test.cjs`.
+First run: open **Manual measurement** and enter the screen size, inside
+angle (or the outer-edge distance) and gap. Check the tracking camera
+values, calibrate the eye distance, then press **Apply & start
+experience**. Values are saved in the browser. Keys: **H** hide column,
+**D** mini-view mode, **P** pause, **R** restart camera.
+
+Tests (Node 18+): `node room-v2.test.cjs`, `node concave-room.test.cjs`
+and `node concave.test.cjs`. `npm install three` enables the projection
+check in `room-v2.test.cjs`.
 
 ---
 
@@ -99,23 +110,26 @@ attached to the tracking camera.
 }
 ```
 
-**Depends on:** the v2 app shell (tasks V1–V3 below), which provides the
-placeholder UI and the saved-profile format. Tasks C0–C2 can start now.
+**Where to plug in:** `calibration-camera.js` already lists and previews
+the calibration camera. `solve()` currently returns `null`. The placeholder
+UI is in `concave-room.html` (`#view-camera`). Results must go into the
+profile through `RoomProfile.sanitize()` (`room-profile.js`), and only after
+the user confirms **Copy to Manual**. The v2 core app (tasks V1–V6) is done.
 
 ### 🧱 v2 core app
 
-- [ ] **V1 · Geometry:** make the screen pair geometry take the inside
+- [x] **V1 · Geometry:** make the screen pair geometry take the inside
       angle, gap and vertical offset (UX §3), with tests for several angles.
-- [ ] **V2 · Full room response:** remove the 75% room follow. Remove the
+- [x] **V2 · Full room response:** remove the 75% room follow. Remove the
       separate display windows (Open left/right).
-- [ ] **V3 · Layout:** left 20% column with the foldable setup panel above
+- [x] **V3 · Layout:** left 20% column with the foldable setup panel above
       and the debug mini-view below. Home / Manual / Camera (placeholder)
       views and a sticky **Apply & start experience** footer.
-- [ ] **V4 · Saved profile:** automatic save and load, editable fields,
+- [x] **V4 · Saved profile:** automatic save and load, editable fields,
       JSON export and import, and a last-calibrated timestamp.
-- [ ] **V5 · Manual page:** angle helper (outer-edge distance → angle),
+- [x] **V5 · Manual page:** angle helper (outer-edge distance → angle),
       live diagram and alignment test pattern.
-- [ ] **V6 · Debug mini-view:** top and side views with eye, frusta,
+- [x] **V6 · Debug mini-view:** top and side views with eye, frusta,
       screens, tracking camera and parameter tags.
 
 ---
@@ -124,9 +138,13 @@ placeholder UI and the saved-profile format. Tasks C0–C2 can start now.
 
 | File | Purpose |
 |---|---|
-| `concave-room.html/.js/.css` | Portrait concave room app (becomes the v2 app) |
-| `concave-geometry.js` | Screen corners and off-axis projection |
+| `concave-room.html/.js/.css` | The v2 app: setup column, experience, tracking |
+| `concave-geometry.js` | Screen pair corners (angle, gap, offset) and off-axis projection |
+| `room-profile.js` | Saved profile: defaults, validation, save/load, derived geometry |
+| `room-miniview.js` | Debug mini-view drawing (top and side views) |
+| `calibration-camera.js` | Camera auto-calibration (placeholder: camera select and preview) |
 | `concave-tracking.js`, `concave-room-tracking.js` | MediaPipe iris tracking → eye position |
+| `tools/span_window.py` | Launch fullscreen across both monitors |
 | `models/panda.glb` | Panda model |
 | `index.html`, `concave.html` | v1.0 demos (kept) |
 | `docs/UX.md` | v2 UX specification: the source of truth |

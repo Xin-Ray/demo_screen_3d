@@ -1,11 +1,45 @@
 /* Physical coordinates in metres: +x right, +y up, +z from seam toward viewer. */
 (function (root) {
   const q = Math.SQRT1_2;
-  function screens(width, height) {
+  // Screen pair around a shared vertical seam. The origin is where the two
+  // display planes meet; `angle` is the inside angle between the display
+  // surfaces (degrees, 180 = flat), `gap` the straight-line distance between
+  // the inner lit edges and `vOffset` how much higher the right panel sits.
+  // Defaults reproduce the original 90-degree, gapless pair exactly.
+  function screens(width, height, { angle = 90, gap = 0, vOffset = 0 } = {}) {
+    if (angle === 90 && gap === 0 && vOffset === 0) {
+      return [
+        { name: 'left', pa: [-width*q, -height/2, width*q], pb: [0, -height/2, 0], pc: [-width*q, height/2, width*q] },
+        { name: 'right', pa: [0, -height/2, 0], pb: [width*q, -height/2, width*q], pc: [0, height/2, 0] }
+      ];
+    }
+    const half = angle*Math.PI/360, sin = Math.sin(half), cos = Math.cos(half);
+    const inner = gap/(2*sin), outer = inner+width;
+    const at = (sign, along, y) => [sign*sin*along, y, cos*along];
+    const lo = -vOffset/2, ro = vOffset/2;
     return [
-      { name: 'left', pa: [-width*q, -height/2, width*q], pb: [0, -height/2, 0], pc: [-width*q, height/2, width*q] },
-      { name: 'right', pa: [0, -height/2, 0], pb: [width*q, -height/2, width*q], pc: [0, height/2, 0] }
+      { name: 'left', pa: at(-1, outer, lo-height/2), pb: at(-1, inner, lo-height/2), pc: at(-1, outer, lo+height/2) },
+      { name: 'right', pa: at(1, inner, ro-height/2), pb: at(1, outer, ro-height/2), pc: at(1, inner, ro+height/2) }
     ];
+  }
+  // Signed distance (metres) from a point to a panel's plane; positive on the
+  // viewing side.
+  function planeDistance(screen, point) {
+    const [ax, , az] = screen.pa, [bx, , bz] = screen.pb;
+    const rx = bx-ax, rz = bz-az, length = Math.hypot(rx, rz);
+    // normal = right x up with up = +y: (-rz, 0, rx)/|r|
+    return ((point.x-ax)*-rz + (point.z-az)*rx)/length;
+  }
+  function inFront(point, pair, margin = 0) {
+    return pair.every(screen => planeDistance(screen, point) >= margin);
+  }
+  // Angle helper: outer-edge distance D, gap g, width w -> inside angle.
+  function angleFromOuterDistance(distance, width, gap = 0) {
+    const s = (distance-gap)/(2*width);
+    return s > 0 && s <= 1 ? 360*Math.asin(s)/Math.PI : NaN;
+  }
+  function outerDistance(angle, width, gap = 0) {
+    return gap+2*width*Math.sin(angle*Math.PI/360);
   }
   function clampEye(eye) {
     const z = Math.max(.30, Math.min(.60, eye.z));
@@ -39,5 +73,5 @@
     camera.projectionMatrix.elements[8] += (screen.name === 'left' ? 2 : -2)*seamOverlap;
     camera.projectionMatrixInverse.copy(camera.projectionMatrix).invert();
   }
-  root.ConcaveGeometry = { screens, clampEye, foreground, project };
+  root.ConcaveGeometry = { screens, planeDistance, inFront, angleFromOuterDistance, outerDistance, clampEye, foreground, project };
 })(typeof window === 'undefined' ? globalThis : window);

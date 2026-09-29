@@ -304,13 +304,13 @@ edges, the screen geometry is the problem.
 
 | Area | Change |
 |---|---|
-| `concave-geometry.js` | `screens(width, height)` becomes `screens({width, height, angle, gap, vOffset})`. `project()` is unchanged. |
-| `concave-room.js` | Remove the 75% room follow. Remove the display-window / BroadcastChannel mode. Add a profile load/save step and the debug mini-view. |
+| `concave-geometry.js` | `screens(width, height, {angle, gap, vOffset})`. The options default to the v1 90°/gapless pair, so the v1 demos are unchanged. Adds `planeDistance`, `inFront`, `angleFromOuterDistance`, `outerDistance`. `project()` is unchanged. |
+| `concave-room.js` | Remove the 75% room follow. Remove the display-window / BroadcastChannel mode. The profile lives in `room-profile.js` and the mini-view drawing in `room-miniview.js`. |
 | `concave-room.html` | Restructure the controls into the foldable drawer with Home / Manual / Camera views and a sticky **Apply** footer. Remove Open left/right. |
 | New | `calibration-camera.js`: v2.0 = placeholder UI plus calibration-camera selection and preview only. Later: ChArUco detection via OpenCV.js and the shared-board pose solver. |
 | Layout | Left 20% column on the left screen: setup panel above, mini-view below. |
 | Versioning | The current demos are tagged `v1.0` and stay in the repo. v2.0 turns `concave-room.html` into the single app. |
-| Tests | Extend `concave-room.test.cjs`: corner positions for several angles (60°–180°) and gaps; a flat 180°, 0-gap pair must match a single wide screen. |
+| Tests | `room-v2.test.cjs`: corner positions for angles 60°–180°, gaps and offsets; a flat 180°, 0-gap pair must match a single wide screen; the angle helper; profile sanitizing. |
 
 ---
 

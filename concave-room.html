@@ -2,67 +2,123 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Portrait Portal · Concave Room</title>
-<link rel="stylesheet" href="concave.css"><link rel="stylesheet" href="concave-room.css">
+<title>Concave Room</title>
+<link rel="stylesheet" href="concave-room.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4.1633559619/face_mesh.js" crossorigin="anonymous"></script>
 <script defer src="concave-tracking.js"></script><script defer src="concave-room-tracking.js"></script>
-<script defer src="concave-geometry.js"></script><script defer src="concave-room.js"></script>
+<script defer src="concave-geometry.js"></script><script defer src="room-profile.js"></script>
+<script defer src="room-miniview.js"></script><script defer src="calibration-camera.js"></script>
+<script defer src="concave-room.js"></script>
 </head>
 <body>
-<main id="stage" aria-label="A deep room viewed through two portrait windows"></main>
-<div id="seam-marker" aria-hidden="true"></div>
-<details id="controls" open>
-<summary>Portrait Portal <span>90° CONCAVE · PORTRAIT ROOM</span></summary>
-<p class="intro">A seated, floating panda in a continuous colored room. Front lighting casts shadows onto the floor and walls; the outer border joins both screens into one opening.</p>
-<div class="actions"><button id="hide-setup">Hide setup · H</button><button id="toggle-dance">Pause motion</button></div>
-<details class="setup" open><summary>Webcam &amp; viewpoint</summary>
-<svg id="setup-diagram" viewBox="0 0 280 375" role="img" aria-label="Live top and side views of the two screens, tracking webcam, its direction, and viewer eye position">
-<defs><marker id="aim-arrow" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"><path d="M0 0 L6 3 L0 6" fill="#b59cff"/></marker></defs>
-<text x="12" y="16">TOP · 90° CORNER</text><text x="12" y="195">SIDE · HEIGHT &amp; TILT</text>
-<polyline id="plan-panels" fill="none" stroke="#84989d" stroke-width="5"/>
-<line id="side-panel" stroke="#84989d" stroke-width="5"/>
-<line id="plan-sight" stroke="#edc58d" stroke-dasharray="3 4"/>
-<line id="plan-aim" stroke="#b59cff" stroke-width="2" marker-end="url(#aim-arrow)"/>
-<circle id="plan-camera" r="5" fill="#b59cff"/><circle id="plan-eye" r="5" fill="#edc58d"/><line id="side-sight" stroke="#edc58d" stroke-dasharray="3 4"/>
-<line id="side-aim" stroke="#b59cff" stroke-width="2" marker-end="url(#aim-arrow)"/>
-<circle id="side-camera" r="5" fill="#b59cff"/><circle id="side-eye" r="5" fill="#edc58d"/><circle cx="17" cy="366" r="4" fill="#b59cff"/><text x="27" y="370">WEBCAM</text><circle cx="135" cy="366" r="4" fill="#edc58d"/><text x="145" y="370">VIEWPOINT</text></svg>
-<p id="pose-readout" class="hint"></p>
-</details>
-<label for="camera-distance-slider">Calibration: eyes → webcam lens <output id="selected-distance-value">120 cm</output></label>
-<input id="camera-distance-slider" type="range" min="20" max="400" step="1" value="120">
-<p class="hint">Set the measured straight-line distance from your eyes to the lens, hold still, then calibrate. The camera determines your eye direction and position. Dragging while your eyes are detected applies the new distance to the current camera observations.</p>
-<div class="actions"><button id="calibrate" disabled>Calibrate tracking</button><button id="restart-camera">Restart webcam</button></div>
-<div class="telemetry"><span id="distance-label">Tracked eyes → webcam</span><output id="camera-distance">—</output></div>
-<video id="video" autoplay muted playsinline hidden></video>
-<label for="model-depth">Character depth <output id="model-depth-value"></output></label>
-<input id="model-depth" type="range" min="-25" max="10" step="1" value="8">
-<p class="hint">The panda starts 8 cm in front of the seam; the room extends farther behind it. This depth separation makes the panda shift more strongly than the distant room as you move. Negative values move it behind the seam.</p>
-<details class="setup"><summary>Tracking webcam placement</summary>
-<p class="hint">Default mount: centered above the shared top corner, facing into the room toward you. Positions are measured from the seam; height follows the screen’s top edge.</p>
-<label>Left / right from seam (cm)<input id="webcam-x" type="number" min="-150" max="150" step="1" value="0"></label>
-<label>Above top edge (cm)<input id="webcam-top" type="number" min="-250" max="100" step="1" value="3"></label>
-<label>Forward from seam (cm)<input id="webcam-z" type="number" min="-50" max="100" step="1" value="0"></label>
-<label>Yaw toward right (°)<input id="webcam-yaw" type="number" min="-80" max="80" step="1" value="0"></label>
-<label>Tilt down (°)<input id="webcam-tilt" type="number" min="-60" max="80" step="1" value="25"></label>
-<label>Horizontal field of view (°)<input id="webcam-fov" type="number" min="30" max="120" step="1" value="60"></label>
-<p class="hint">Match these values to the physical webcam mount. Recalibrate after changing its position, tilt, field of view, or screen dimensions.</p>
-</details>
-<details class="setup" open><summary>Portrait screen setup</summary>
-<div class="dimensions"><label>Width (cm)<input id="screen-width" type="number" min="20" max="150" step="0.1" value="33.6"></label><label>Height (cm)<input id="screen-height" type="number" min="30" max="250" step="0.1" value="59.8"></label></div>
-<label for="seam-overlap">Seam overlap <output id="seam-overlap-value">0% · exact projection</output></label>
-<input id="seam-overlap" type="range" min="-20" max="20" step="0.1" value="0">
-<button id="reset-overlap">Reset overlap</button>
-<p class="hint">Drag left to reduce duplicated content at the corner; drag right to show more shared content on both screens. This shifts each view by the selected percentage of its panel width without resizing the panda. Zero restores the calibrated projection. Applies to separate display windows too.</p>
-<label for="seam">Physical seam alignment <output id="seam-value">50%</output></label><input id="seam" type="range" min="20" max="80" step="0.1" value="50">
-<p class="hint">Enter each panel’s visible dimensions. Span both inward-facing screens, or open a window for each. The border is one flat virtual opening projected onto the 90° panels. Its edges can look bent in a flat preview; judge alignment from your calibrated eye position on the physical screens. Press H to hide setup and the seam guide.</p>
-<div class="actions"><button id="open-left">Open left</button><button id="open-right">Open right</button></div>
-</details>
-<button id="fullscreen">Fullscreen</button><p id="status" role="status">Starting webcam tracking…</p>
-<a class="original" href="index.html">← Index</a> · <a class="original" href="concave.html">Tracked concave demo</a>
-</details>
-<div id="presentation-tools" hidden><button id="show-setup">Setup · H</button></div>
-<div id="display-tools" hidden><span id="display-title"></span><button id="display-fullscreen">Fullscreen</button><span id="connection" role="status">Waiting for controller…</span></div>
-<div id="footer">PORTRAIT PORTAL <span>One room · front-lit shadows · floating figure · H hides setup</span></div>
+<main id="stage" aria-label="A room seen through two angled screens"></main>
+
+<aside id="column" aria-label="Setup and debug">
+  <section id="setup" class="open">
+    <header>
+      <button id="setup-toggle" aria-expanded="true" title="Fold setup">Setup <span aria-hidden="true">▲</span></button>
+      <nav id="crumbs"><button data-view="home" class="crumb">Home</button><span id="crumb-current"></span></nav>
+    </header>
+    <div id="setup-body">
+
+      <!-- 4.1 Home -->
+      <div class="view" id="view-home">
+        <div id="profile-card" class="card"></div>
+        <button class="big" data-view="manual"><b>Manual measurement</b><small>Measure with a tape and type the numbers.</small></button>
+        <button class="big" data-view="camera"><b>Camera auto-calibration <em class="badge">Preview</em></b><small>Use a second camera to measure the screens automatically.</small></button>
+        <h3>Scene</h3>
+        <label>Character depth <output id="model-depth-value"></output>
+          <input id="model-depth" type="range" min="-25" max="10" step="1" value="8"></label>
+        <div class="row"><button id="toggle-dance">Pause motion · P</button></div>
+        <p class="hint">Keys: H hide column · D mini-view mode · P pause · R restart camera</p>
+      </div>
+
+      <!-- 4.2 Manual measurement -->
+      <div class="view" id="view-manual" hidden>
+        <h3>Screens</h3>
+        <div class="grid2">
+          <label>Width (cm)<input data-group="screen" data-key="width" type="number" step="0.1"></label>
+          <label>Height (cm)<input data-group="screen" data-key="height" type="number" step="0.1"></label>
+          <label>Inside angle (°)<input data-group="screen" data-key="angle" type="number" step="0.5"></label>
+          <label>Outer edges (cm)<input id="outer-distance" type="number" step="0.1" min="1" max="400"></label>
+          <label>Gap at seam (cm)<input data-group="screen" data-key="gap" type="number" step="0.1"></label>
+          <label>Vertical offset (cm)<input data-group="screen" data-key="vOffset" type="number" step="0.1"></label>
+        </div>
+        <p class="hint">Angle between the display surfaces on your side (180 = flat). Or type the straight distance between the two outer lit edges and the angle is calculated. Gap = straight distance between the inner lit edges.</p>
+        <label>Seam position in window <output id="seam-value"></output>
+          <input data-group="screen" data-key="seamSplit" type="range" step="0.1"></label>
+
+        <h3>Tracking camera</h3>
+        <label>Camera<select id="tracking-device"><option value="">Default camera</option></select></label>
+        <div class="grid2">
+          <label>Above top (cm)<input data-group="trackingCamera" data-key="top" type="number" step="0.5"></label>
+          <label>Forward (cm)<input data-group="trackingCamera" data-key="forward" type="number" step="0.5"></label>
+          <label>Tilt down (°)<input data-group="trackingCamera" data-key="tilt" type="number" step="1"></label>
+          <label>Horiz. FOV (°)<input data-group="trackingCamera" data-key="fov" type="number" step="1"></label>
+        </div>
+        <p class="hint">Mounted on top of the seam, facing you. Height is above the top of the screens; forward is from the corner toward you. The mini-view below updates as you type.</p>
+
+        <label class="check"><input id="test-pattern" type="checkbox"> Alignment test pattern</label>
+        <p class="hint">Grid floor, gridded back wall, a pole on the seam line and horizontal lines. From your eye position they should look straight across both screens.</p>
+
+        <details><summary>Advanced</summary>
+          <label>Seam overlap <output id="overlap-value"></output> <small>non-physical correction</small>
+            <input data-group="advanced" data-key="overlap" type="range" step="0.1"></label>
+          <div class="grid2">
+            <label>Camera yaw (°)<input data-group="trackingCamera" data-key="yaw" type="number" step="1"></label>
+            <label>Camera left/right (cm)<input data-group="trackingCamera" data-key="x" type="number" step="0.5"></label>
+            <label>Smoothing (ms)<input data-group="advanced" data-key="smoothingMs" type="number" step="10"></label>
+          </div>
+        </details>
+
+        <h3>Profile</h3>
+        <div class="row"><button id="export-profile">Export JSON</button><button id="import-profile">Import JSON</button></div>
+        <input id="import-file" type="file" accept="application/json,.json" hidden>
+        <p class="hint">v1.0 demos: <a href="index.html">flat</a> · <a href="concave.html">90° concave</a></p>
+      </div>
+
+      <!-- 4.3 Camera auto-calibration (placeholder) -->
+      <div class="view" id="view-camera" hidden>
+        <div class="banner">Preview — automatic calibration is not available yet. <button class="link" data-view="manual">Go to Manual measurement</button></div>
+        <h3>Calibration camera</h3>
+        <label>Camera<select id="calib-device"><option value="">Select a camera…</option></select></label>
+        <video id="calib-video" autoplay muted playsinline hidden></video>
+        <h3>Board</h3>
+        <div class="grid2">
+          <label>Square size (mm)<input id="board-square" type="number" value="30" min="5" max="100" step="1"></label>
+          <label>Board<select id="board-size"><option>A4</option><option>A3</option></select></label>
+        </div>
+        <div class="row"><button disabled>Download board PDF</button></div>
+        <label class="check"><input type="checkbox" disabled> Show screen markers</label>
+        <div class="row"><button disabled>Capture</button><span class="progress"><span style="width:0"></span></span><small>0 / 8 good captures</small></div>
+        <h3>Results</h3>
+        <table id="calib-results"><thead><tr><th>Field</th><th>Value</th><th>Conf.</th></tr></thead><tbody></tbody></table>
+        <div class="row"><button disabled>Copy to Manual</button></div>
+      </div>
+
+      <!-- Shared: eye-distance calibration (Manual and Camera views) -->
+      <div id="eye-calibration" hidden>
+        <h3>Eye-distance calibration</h3>
+        <video id="video" autoplay muted playsinline hidden></video>
+        <label>Eyes → webcam lens <output id="selected-distance-value">120 cm</output>
+          <input id="camera-distance-slider" type="range" min="20" max="400" step="1" value="120"></label>
+        <div class="row"><button id="calibrate" disabled>Calibrate tracking</button><button id="restart-camera">Restart webcam</button></div>
+        <p class="hint">Measure your eyes-to-lens distance, sit still with both eyes visible, then calibrate.</p>
+      </div>
+      <p id="status" role="status"></p>
+    </div>
+    <footer><button id="apply" class="primary">Apply &amp; start experience</button></footer>
+  </section>
+
+  <section id="debug" aria-label="Debug mini-view">
+    <div class="debug-head">DEBUG <span id="mini-mode">both</span><span class="legend"><i class="l"></i>L <i class="r"></i>R <i class="c"></i>cam <i class="e"></i>eye</span></div>
+    <canvas id="miniview"></canvas>
+    <div id="tags"></div>
+    <div id="warnings" role="alert"></div>
+  </section>
+</aside>
+
+<div id="status-pill" hidden></div>
 </body></html>
