@@ -10,6 +10,7 @@
 <script defer src="concave-tracking.js"></script><script defer src="concave-room-tracking.js"></script>
 <script defer src="concave-geometry.js"></script><script defer src="room-profile.js"></script>
 <script defer src="room-miniview.js"></script><script defer src="calibration-camera.js"></script>
+<script defer src="tracking-accuracy.js"></script>
 <script defer src="concave-room.js"></script>
 </head>
 <body>
@@ -31,8 +32,11 @@
         <h3>Scene</h3>
         <label>Character depth <output id="model-depth-value"></output>
           <input id="model-depth" type="range" min="-25" max="10" step="1" value="8"></label>
-        <div class="row"><button id="toggle-dance">Pause motion · P</button></div>
-        <p class="hint">Keys: H hide column · D mini-view mode · P pause · R restart camera</p>
+        <div class="row"><button id="toggle-dance">Pause motion · P</button><button id="span-screens" title="Stretch the window across both monitors">Span both screens · F</button></div>
+        <h3>Tracking accuracy test</h3>
+        <div class="row"><button id="run-accuracy">Run accuracy test</button></div>
+        <div id="accuracy-result"></div>
+        <p class="hint">Keys: H hide column · D mini-view mode · P pause · F span both screens · L live distance · R restart camera</p>
       </div>
 
       <!-- 4.2 Manual measurement -->
@@ -52,6 +56,7 @@
 
         <h3>Tracking camera</h3>
         <label>Camera<select id="tracking-device"><option value="">Default camera</option></select></label>
+        <label>Eye detector<select id="detector-select"><option value="two-stage">Face Mesh + zoom search (default)</option><option value="fullframe">Face Mesh only (fast, short range)</option><option value="landmarker">Face Landmarker (experimental)</option></select></label>
         <div class="grid2">
           <label>Above top (cm)<input data-group="trackingCamera" data-key="top" type="number" step="0.5"></label>
           <label>Forward (cm)<input data-group="trackingCamera" data-key="forward" type="number" step="0.5"></label>
@@ -59,6 +64,11 @@
           <label>Horiz. FOV (°)<input data-group="trackingCamera" data-key="fov" type="number" step="1"></label>
         </div>
         <p class="hint">Mounted on top of the seam, facing you. Height is above the top of the screens; forward is from the corner toward you. The mini-view below updates as you type.</p>
+
+        <h3>Foreground model</h3>
+        <label>Model<select id="model-select"><option value="panda">Panda</option><option value="cube">Cube</option><option value="sphere">Sphere</option><option value="file">Load file…</option></select></label>
+        <input id="model-file" type="file" accept=".glb,.gltf,model/gltf-binary,model/gltf+json" hidden>
+        <p class="hint">The object floating in front of the seam. Load file… uses a local .glb/.gltf for this session only.</p>
 
         <label class="check"><input id="test-pattern" type="checkbox"> Alignment test pattern</label>
         <p class="hint">Grid floor, gridded back wall, a pole on the seam line and horizontal lines. From your eye position they should look straight across both screens.</p>
@@ -70,6 +80,7 @@
             <label>Camera yaw (°)<input data-group="trackingCamera" data-key="yaw" type="number" step="1"></label>
             <label>Camera left/right (cm)<input data-group="trackingCamera" data-key="x" type="number" step="0.5"></label>
             <label>Smoothing (ms)<input data-group="advanced" data-key="smoothingMs" type="number" step="10"></label>
+            <label>Steadiness (%)<input data-group="advanced" data-key="steadiness" type="number" step="5"></label>
           </div>
         </details>
 
@@ -121,4 +132,5 @@
 </aside>
 
 <div id="status-pill" hidden></div>
+<div id="live-distance" aria-live="off"></div>
 </body></html>

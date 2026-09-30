@@ -6,5 +6,5 @@ echo "Starting local web server on port $PORT..."
 echo "Open http://localhost:$PORT in your web browser (Chrome/Firefox)."
 echo "Press Ctrl+C to stop the server."
 
-# Start the python HTTP server
-python3 -m http.server $PORT
+# Static server + /span endpoint for the Span button
+python3 tools/serve.py $PORT

@@ -13,7 +13,7 @@ window into a 3D room with a floating panda.
 ## Run
 
 ```bash
-bash run.sh                        # serves this folder on http://localhost:8000
+bash run.sh                        # serves this folder (+ /span endpoint) on http://localhost:8000
 python3 tools/span_window.py       # opens the app fullscreen across both monitors (X11)
 ```
 
@@ -29,7 +29,12 @@ values, calibrate the eye distance, then press **Apply & start
 experience**. Values are saved in the browser. Keys: **H** hide column,
 **D** mini-view mode, **P** pause, **R** restart camera.
 
-Tests (Node 18+): `node room-v2.test.cjs`, `node concave-room.test.cjs`
+v2.0.1 adds: **Span both screens** button (F), live eye-distance readout (L),
+saved eye calibration with auto-apply on launch, eye-detector and 3D-model
+selectors, a steadiness (shake) filter, a tracking accuracy test on Home,
+1080p zoom-search tracking, and calibration kept when out of range.
+
+Tests (Node 18+): `node tracking-accuracy.test.cjs`, `node room-v2.test.cjs`, `node concave-room.test.cjs`
 and `node concave.test.cjs`. `npm install three` enables the projection
 check in `room-v2.test.cjs`.
 

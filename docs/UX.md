@@ -167,6 +167,7 @@ for this.
 - **Export / Import profile (.json)** buttons allow a backup or moving the
   setup to another computer.
 - A timestamp records when the profile was last calibrated.
+- The profile also stores the chosen foreground model and eye detector (§4.2).
 
 ---
 
@@ -190,23 +191,48 @@ Sections, top to bottom:
 1. **Screens:** width, height, inside angle *or* outer-edge distance, gap,
    vertical offset.
 2. **Tracking camera:** a camera dropdown (needed because a second USB
-   camera may be connected), then height, forward, tilt and FOV. Yaw and
-   left/right offset are under *Advanced*.
-3. **Live diagram:** the debug mini-view directly below the setup panel
+   camera may be connected), an **Eye detector** dropdown, then height,
+   forward, tilt and FOV. Yaw and left/right offset are under *Advanced*.
+   Eye detector options (all give the 478-point face + iris landmarks the
+   tracker reads; the iris size gives the distance):
+   - **Face Mesh + zoom search** (default): MediaPipe Face Mesh on a crop
+     around the face once found (more iris pixels); while no face is found
+     it cycles the full frame and zoomed centre/left/right crops so a
+     distant face is found too.
+   - **Face Mesh only**: MediaPipe Face Mesh on the whole frame (the v2.0
+     behaviour, short range, about 2 m). Fastest.
+   - **Face Landmarker (experimental)**: the newer MediaPipe Tasks
+     Face Landmarker on the same crop. Needs internet to load its model; if
+     it fails to load the status line says so and the previous detector is
+     used.
+   Changing the detector restarts tracking and discards the eye calibration
+   (iris sizes differ slightly per detector), so recalibrate afterwards. The
+   choice is saved in the profile (`detector`: `two-stage`, `fullframe`,
+   `landmarker`). The Home status card shows the active detector.
+3. **Foreground model:** a dropdown for the object floating in front of
+   the seam. Options: **Panda** (default, `models/panda.glb`), **Cube**
+   (edged cube, good for judging perspective), **Sphere** (checker pattern)
+   and **Load file…** (a local `.glb`/`.gltf`, used for this session only;
+   too big to store, so the next launch falls back to Panda). Every model
+   is scaled to the same height and centred. The choice takes effect
+   immediately and is saved in the profile on **Apply** (`model`: `panda`,
+   `cube` or `sphere`). If a model fails to load, the status line says so and
+   the previous model stays.
+4. **Live diagram:** the debug mini-view directly below the setup panel
    (§5.1) *is* the live diagram. It redraws the screen pair to scale at the
    entered angle and gap, with the webcam and its view cone, on every
    keystroke. No second copy is shown.
-4. **Alignment test pattern** (toggle): replaces the scene with a grid
+5. **Alignment test pattern** (toggle): replaces the scene with a grid
    floor, a gridded back wall, a vertical pole on the seam line (x = 0)
    behind the screens, and horizontal lines running across both screens. When the numbers are right, the lines look
    straight and continuous from the calibrated eye position.
-5. **Eye-distance calibration:** the live webcam preview, a slider for the
+6. **Eye-distance calibration:** the live webcam preview, a slider for the
    measured eye → webcam distance, and a **Calibrate tracking** button.
    This step is the same on both setup paths.
-6. **Advanced** (collapsed): seam overlap (default 0, labelled *non-physical
+7. **Advanced** (collapsed): seam overlap (default 0, labelled *non-physical
    correction*), webcam yaw, webcam left/right offset, and tracking
    smoothing time (default 180 ms).
-7. **Profile:** Export JSON / Import JSON buttons, and a link to the v1.0
+8. **Profile:** Export JSON / Import JSON buttons, and a link to the v1.0
    demos.
 
 Footer: **Apply & start experience**.
@@ -258,6 +284,39 @@ values.
   across both monitors by `tools/span_window.py` (see README). The script
   launches Chrome as a frameless app window and asks the window manager to
   make it fullscreen across both monitors.
+- If tracking is not yet calibrated, **Apply** calibrates automatically as
+  soon as 12 steady samples exist, using the eyes → webcam distance from the
+  slider (the user must sit at that distance). Without calibration the eye
+  distance stays fixed at the slider value.
+- **Auto-apply on launch:** when a saved profile exists, the app opens with
+  the setup panel folded and tracking running. The eye calibration (and the
+  eyes → webcam distance) is saved on Apply and Calibrate, and restored on
+  launch if the webcam pose and camera aspect are unchanged. Otherwise
+  recalibrate.
+- **Zoom-search tracking (range):** once a face is found, Face Mesh runs on
+  a crop around it so a distant face gives the iris enough pixels; while
+  searching it cycles the full frame and zoomed crops. (A separate MediaPipe
+  face-finder was tried and removed: it crashed in the browser.)
+- **Tracking accuracy test** (Home, Scene section): **Run accuracy test**
+  simulates the webcam and shows the worst eye error (cm) per viewing
+  distance for wrong FOV, tilt, slider distance and iris-pixel error.
+  Same code as `node tracking-accuracy.test.cjs`.
+- **Steadiness filter (shake reduction):** the eye position from the
+  webcam is noisy (mostly the distance, from the iris size), which makes
+  the picture shake while the viewer sits still. A speed-adaptive
+  (One Euro) filter smooths heavily when the head is still and lightly
+  when it moves, so it removes the shake without adding lag to real
+  movement. **Advanced → Steadiness (%)**, default 50: higher = steadier
+  but slightly slower to follow, 0 = almost no filtering. Saved in the
+  profile (`advanced.steadiness`). It runs before the existing smoothing
+  time; lower the smoothing time if the picture feels laggy.
+- **Span both screens** button (Home view, Scene section, key **F**): uses
+  the Window Management API (`getScreenDetails`, asks the browser's
+  permission once) to find the bounding box of all monitors, then moves and
+  resizes the window to it. If the browser refuses to resize a normal tab,
+  it opens the app in a popup window at that box instead. Status text
+  reports failures (no permission, single monitor). `tools/span_window.py`
+  remains the true-fullscreen option.
 - Eye tracking runs on the seam-top webcam and drives one eye position for
   both screen projections.
 - The whole scene responds fully and physically correctly: room, frame,
