@@ -68,27 +68,29 @@ angle, plus the screen pair's inside angle, gap and offset.
 Read first: [`docs/UX.md` §0, §3, §4.3, §5.1](docs/UX.md). Camera
 calibration is **optional**, and manual input must always keep working.
 
-Method (from the UX spec): a flat printed **ChArUco board** is held about
-1 m in front of the screens. The tracking camera sees the board. The
-calibration camera sees the board and the marker patterns on both screens.
-Chaining the two gives every pose relative to the screens. Nothing is
-attached to the tracking camera.
+Method (from the UX spec): a rigid **ChArUco board** (the lab's 9 × 7 board,
+or a printed PDF) lies face up 40–50 cm in front of the screens. The
+tracking camera sees the board. The calibration camera sees the board and
+the marker patterns on both screens. Chaining the two gives every pose
+relative to the screens. Nothing is attached to the tracking camera.
 
-- [ ] **C0 · UX detail:** expand `docs/UX.md` §4.3 into the full working
+- [x] **C0 · UX detail:** expand `docs/UX.md` §4.3 into the full working
       flow: exact screens and states, capture guidance text, error messages
       and what "good capture" means. Get it reviewed **before any code**.
 - [ ] **C1 · Camera selection:** list USB cameras, exclude the tracking
       camera, show a live preview and remember the choice.
-- [ ] **C2 · Board:** generate a ChArUco board PDF (A4/A3, 100% scale)
-      with the square size printed on it, and enable **Download board PDF**.
+- [ ] **C2 · Board:** board settings (columns × rows, square and marker
+      size, dictionary with auto-detect, size check), and a generated
+      ChArUco board PDF (A4/A3, 100% scale) behind **Download board PDF**.
 - [ ] **C3 · Screen markers:** the **Show screen markers** toggle shows
       marker patterns full-screen on both monitors, placed using the current
       screen geometry.
 - [ ] **C4 · Detection and capture:** detect the board and markers with
       OpenCV.js in both camera feeds, accept only frames where both cameras
       see the board, and drive the "N / 8 good captures" progress bar.
-- [ ] **C5 · Tracking camera intrinsics:** estimate the tracking camera's
-      real field of view from the board captures.
+- [ ] **C5 · Lens calibration:** guided lens calibration for both cameras
+      (10 good views, coverage grid), saved per camera and resolution. Gives
+      the tracking camera's real field of view.
 - [ ] **C6 · Pose solver:** board → tracking camera and board → screens,
       chained into the profile fields (see contract below), with a
       confidence value for each field.
@@ -110,7 +112,7 @@ attached to the tracking camera.
 ```js
 {
   screen: { width, height, angle, gap, vOffset },
-  trackingCamera: { top, forward, yaw, tilt, fov },
+  trackingCamera: { top, forward, x, yaw, tilt, fov },
   confidence: { /* same keys, 0–1 */ }
 }
 ```
