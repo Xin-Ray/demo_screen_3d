@@ -70,3 +70,34 @@ assert.equal(P.load(memory).saved, false);
 assert.ok(P.save(memory, s)); assert.equal(P.load(memory).profile.screen.angle, 120);
 memory.data[P.KEY] = '{broken'; assert.equal(P.load(memory).saved, false);
 console.log('PASS: profile defaults, range sanitizing, save/load, camera pose.');
+
+{
+  const P2 = globalThis.RoomProfile;
+  assert.equal(P2.defaults().model, 'panda');
+  assert.equal(P2.sanitize({model: 'cube'}).model, 'cube');
+  assert.equal(P2.sanitize({model: '../evil.glb'}).model, 'panda');
+  console.log('PASS: foreground model field defaults to panda and rejects unknown values.');
+}
+
+{
+  const P3 = globalThis.RoomProfile;
+  assert.equal(P3.defaults().detector, 'two-stage');
+  assert.equal(P3.sanitize({detector: 'landmarker'}).detector, 'landmarker');
+  assert.equal(P3.sanitize({detector: 'nope'}).detector, 'two-stage');
+  console.log('PASS: eye detector field defaults to two-stage and rejects unknown values.');
+}
+
+{
+  require('./concave-room-tracking.js');
+  const {createSteadyFilter} = globalThis.PortraitTracking;
+  let seed = 7; const noise = () => ((seed = (seed*16807)%2147483647)/2147483647-.5)*.04; // +-2 cm
+  const std = values => { const m = values.reduce((a,b)=>a+b)/values.length; return Math.sqrt(values.reduce((a,b)=>a+(b-m)**2,0)/values.length); };
+  const still = createSteadyFilter(50), raw = [], out = [];
+  for (let i = 0; i < 300; i++) { const z = 1+noise(); raw.push(z); out.push(still.apply({x:0,y:0,z}, 1/30).z); }
+  assert.ok(std(out.slice(60)) < std(raw.slice(60))*.5, 'still head: jitter at least halved');
+  const moving = createSteadyFilter(50); let last;
+  for (let i = 0; i < 30; i++) last = moving.apply({x:0,y:0,z:1}, 1/30);
+  for (let i = 0; i < 15; i++) last = moving.apply({x:0,y:0,z:1.5}, 1/30);  // 50 cm in 0.5 s
+  assert.ok(last.z > 1.4, 'real movement is followed within 0.5 s');
+  console.log('PASS: steadiness filter halves still jitter and follows real movement.');
+}

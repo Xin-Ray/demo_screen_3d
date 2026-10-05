@@ -50,5 +50,26 @@
     }
     return next;
   }
-  root.PortraitTracking = { basis, estimate, eyeFromSample, validEye, smoothEye };
+  // Speed-adaptive low-pass (One Euro): steady when still, responsive when moving. steadiness 0..100.
+  function createSteadyFilter(steadiness = 50) {
+    const minCutoff = 3-2.6*Math.max(0, Math.min(100, steadiness))/100, beta = 4, dCutoff = 1;
+    const alpha = (cutoff, dt) => 1/(1+1/(2*Math.PI*cutoff)/dt);
+    let last = null;
+    return {
+      reset() { last = null; },
+      apply(eye, seconds) {
+        const dt = Math.max(.001, Math.min(seconds, .2));
+        if (!last) { last = {value: {...eye}, speed: {x: 0, y: 0, z: 0}}; return {...eye}; }
+        const out = {};
+        for (const axis of ['x','y','z']) {
+          const raw = (eye[axis]-last.value[axis])/dt;
+          last.speed[axis] += alpha(dCutoff, dt)*(raw-last.speed[axis]);
+          const cutoff = minCutoff+beta*Math.abs(last.speed[axis]);
+          out[axis] = last.value[axis] += alpha(cutoff, dt)*(eye[axis]-last.value[axis]);
+        }
+        return out;
+      }
+    };
+  }
+  root.PortraitTracking = { basis, estimate, eyeFromSample, validEye, smoothEye, createSteadyFilter };
 })(typeof window === 'undefined' ? globalThis : window);

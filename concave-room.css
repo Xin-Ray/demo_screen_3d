@@ -72,3 +72,14 @@ th { color: var(--muted); font-weight: normal; }
   background: #2b1414ee; color: #ffd0d0; border: 1px solid var(--warn); border-radius: 999px; padding: 5px 12px; }
 #setup-toggle { white-space: nowrap; flex: none; }
 .grid2 { align-items: end; }
+
+#accuracy-result table { width: 100%; font-size: 11px; border-collapse: collapse; margin: 4px 0; }
+#accuracy-result th, #accuracy-result td { padding: 2px 3px; text-align: right; }
+#accuracy-result tbody th { text-align: left; font-weight: normal; }
+#accuracy-result td.warn { color: #e0a030; }
+#accuracy-result td.bad { color: #e05050; }
+
+#live-distance { position: fixed; left: 12px; top: 10px; z-index: 3; padding: 6px 10px; border-radius: 6px; pointer-events: none;
+  background: rgba(10,17,24,.72); color: #fff; font: 600 20px/1.2 system-ui, sans-serif; font-variant-numeric: tabular-nums; white-space: pre; }
+#live-distance small { display: block; font-size: 12px; font-weight: 400; opacity: .8; }
+body.distance-hidden #live-distance { display: none; }
