@@ -33,6 +33,14 @@
     ['x','y','z'].forEach((key,i) => { eye[key] = pose[key]+scale*(axes.forward[i]+horizontal*axes.right[i]+vertical*axes.up[i]); });
     return eye;
   }
+  // depth-rgb: a measured point in the camera frame (OpenCV axes: x right, y down,
+  // z forward; metres) -> world, through the webcam pose from the profile.
+  function eyeFromCamera(point, pose) {
+    if (!point || ![point.x,point.y,point.z].every(Number.isFinite) || point.z <= 0) return null;
+    const axes = basis(pose), eye = {};
+    ['x','y','z'].forEach((key,i) => { eye[key] = pose[key]+axes.forward[i]*point.z+axes.right[i]*point.x-axes.up[i]*point.y; });
+    return eye;
+  }
   function validEye(eye) {
     // Both inward-facing panel half-spaces: z+x > 0 and z-x > 0.
     return eye && [eye.x,eye.y,eye.z].every(Number.isFinite)
@@ -71,5 +79,22 @@
       }
     };
   }
-  root.PortraitTracking = { basis, estimate, eyeFromSample, validEye, smoothEye, createSteadyFilter };
+  // Iris size (the distance cue) is far noisier than the eye's image position,
+  // so it gets its own slower One Euro filter, in log units (relative change).
+  function createIrisFilter(steadiness = 50) {
+    const minCutoff = 1.2-1.05*Math.max(0, Math.min(100, steadiness))/100, beta = .6, dCutoff = .5;
+    const alpha = (cutoff, dt) => 1/(1+1/(2*Math.PI*cutoff)/dt);
+    let last = null;
+    return {
+      reset() { last = null; },
+      apply(iris, seconds) {
+        const dt = Math.max(.001, Math.min(seconds, .2)), value = Math.log(iris);
+        if (!last) { last = {value, speed: 0}; return iris; }
+        last.speed += alpha(dCutoff, dt)*((value-last.value)/dt-last.speed);
+        last.value += alpha(minCutoff+beta*Math.abs(last.speed), dt)*(value-last.value);
+        return Math.exp(last.value);
+      }
+    };
+  }
+  root.PortraitTracking = { basis, estimate, eyeFromSample, eyeFromCamera, validEye, smoothEye, createSteadyFilter, createIrisFilter };
 })(typeof window === 'undefined' ? globalThis : window);

@@ -30,8 +30,29 @@
         <button class="big" data-view="manual"><b>Manual measurement</b><small>Measure with a tape and type the numbers.</small></button>
         <button class="big" data-view="camera"><b>Camera auto-calibration <em class="badge">Preview</em></b><small>Use a second camera to measure the screens automatically.</small></button>
         <h3>Scene</h3>
-        <label>Character depth <output id="model-depth-value"></output>
-          <input id="model-depth" type="range" min="-25" max="10" step="1" value="8"></label>
+        <label>Panda position <output id="panda-forward-value"></output>
+          <input data-group="scene" data-key="pandaForward" type="range" step="1"></label>
+        <label>Panda scale <output id="panda-scale-value"></output>
+          <input data-group="scene" data-key="pandaScale" type="range" step="5"></label>
+        <label>Box<select id="box-scene"><option value="cut">Cut box (cut by the screens)</option><option value="open">Open box</option></select></label>
+        <div id="cut-box-controls">
+          <label>Box width <output id="cut-width-value"></output>
+            <input data-group="scene" data-key="cutWidth" type="range" step="1"></label>
+          <label>Box height <output id="cut-height-value"></output>
+            <input data-group="scene" data-key="cutHeight" type="range" step="1"></label>
+          <label>Box depth <output id="cut-depth-value"></output>
+            <input data-group="scene" data-key="cutDepth" type="range" step="1"></label>
+          <p class="hint">The screens cut the box: its edges stay fixed on the screens. Depth = back wall behind the seam. Saved on Apply.</p>
+        </div>
+        <div id="open-box-controls">
+          <label>Box width <output id="box-width-value"></output>
+            <input data-group="scene" data-key="boxWidth" type="range" step="1"></label>
+          <label>Box height <output id="box-height-value"></output>
+            <input data-group="scene" data-key="boxHeight" type="range" step="1"></label>
+          <label>Box position <output id="box-forward-value"></output>
+            <input data-group="scene" data-key="boxForward" type="range" step="1"></label>
+          <p class="hint">Box position: 0 = seam line, + toward you. Saved on Apply.</p>
+        </div>
         <div class="row"><button id="toggle-dance">Pause motion · P</button><button id="span-screens" title="Stretch the window across both monitors">Span both screens · F</button></div>
         <h3>Tracking accuracy test</h3>
         <div class="row"><button id="run-accuracy">Run accuracy test</button></div>
@@ -56,7 +77,7 @@
 
         <h3>Tracking camera</h3>
         <label>Camera<select id="tracking-device"><option value="">Default camera</option></select></label>
-        <label>Eye detector<select id="detector-select"><option value="two-stage">Face Mesh + zoom search (default)</option><option value="fullframe">Face Mesh only (fast, short range)</option><option value="landmarker">Face Landmarker (experimental)</option></select></label>
+        <label>Eye detector<select id="detector-select"><option value="two-stage">Face Mesh + zoom search (default)</option><option value="fullframe">Face Mesh only (fast, short range)</option><option value="landmarker">Face Landmarker (experimental)</option><option value="depth-rgb">depth-rgb (Orbbec depth + colour)</option></select></label>
         <div class="grid2">
           <label>Above top (cm)<input data-group="trackingCamera" data-key="top" type="number" step="0.5"></label>
           <label>Forward (cm)<input data-group="trackingCamera" data-key="forward" type="number" step="0.5"></label>
@@ -113,6 +134,7 @@
       <div id="eye-calibration" hidden>
         <h3>Eye-distance calibration</h3>
         <video id="video" autoplay muted playsinline hidden></video>
+        <img id="depth-preview" alt="depth-rgb camera preview" hidden>
         <label>Eyes → webcam lens <output id="selected-distance-value">120 cm</output>
           <input id="camera-distance-slider" type="range" min="20" max="400" step="1" value="120"></label>
         <div class="row"><button id="calibrate" disabled>Calibrate tracking</button><button id="restart-camera">Restart webcam</button></div>

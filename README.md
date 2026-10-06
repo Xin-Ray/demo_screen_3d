@@ -9,6 +9,7 @@ window into a 3D room with a floating panda.
 |---|---|---|
 | **v1.0** | Original demos: flat screen, 90° concave, portrait room (90° only). | Tag [`v1.0`](../../tree/v1.0) · details in [`docs/v1-README.md`](docs/v1-README.md) |
 | **v2.0** | Core app done: one app with calibration (adjustable angle, seam gap), a fully responsive room and a debug mini-view. Camera auto-calibration is a placeholder. | Spec: [`docs/UX.md`](docs/UX.md) |
+| **v2.1.0** | Cut box (scene 2, cut by the screens) and open box with a Box switch, panda position/scale sliders, depth-rgb eye tracking (Orbbec Femto Bolt colour + depth), steadier iris distance. | Tag [`v2.1.0`](../../tree/v2.1.0) · spec: [`docs/UX.md`](docs/UX.md) |
 
 ## Run
 
@@ -28,6 +29,11 @@ angle (or the outer-edge distance) and gap. Check the tracking camera
 values, calibrate the eye distance, then press **Apply & start
 experience**. Values are saved in the browser. Keys: **H** hide column,
 **D** mini-view mode, **P** pause, **R** restart camera.
+
+v2.1.0 depth-rgb tracking (Orbbec Femto Bolt): create the `femto_bolt` conda env
+(see `sub-features/femto_bolt_charuco/README.md`), run `bash tools/run_depth_rgb.sh`
+next to `run.sh`, then choose **Eye detector → depth-rgb**. Set the camera pose
+(tilt!) to the real mounting; no eye-distance calibration is needed.
 
 v2.0.1 adds: **Span both screens** button (F), live eye-distance readout (L),
 saved eye calibration with auto-apply on launch, eye-detector and 3D-model

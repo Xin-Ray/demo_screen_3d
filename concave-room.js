@@ -10,7 +10,7 @@
   const loaded = RoomProfile.load(storage);
   const profile = loaded.profile;
   let hasSavedProfile = loaded.saved;
-  const state = { depth: .08, eye: { x: 0, y: 0, z: 1.20 }, dancePlaying: true, danceEpoch: Date.now(), danceOffset: 0,
+  const state = { eye: { x: 0, y: 0, z: 1.20 }, dancePlaying: true, danceEpoch: Date.now(), danceOffset: 0,
     testPattern: false, miniMode: 'both', trail: [] };
   let pair, geometryKey = '';
   function derive() {
@@ -46,6 +46,10 @@
     right: new THREE.MeshStandardMaterial({color: 0x77618d, roughness: .95}),
     floor: new THREE.MeshStandardMaterial({color: 0x696d88, roughness: .88}),
     frame: new THREE.MeshBasicMaterial({color: 0x030405}),
+    // Cut-box mask and rim: drawn after the room without writing depth, so they
+    // hide the box's outside but never the panda (drawn last, UX §4.1 Scene).
+    mask: new THREE.MeshBasicMaterial({color: 0x030405, depthWrite: false}),
+    rim: new THREE.MeshBasicMaterial({color: 0x303c49, depthWrite: false}),
     edge: new THREE.MeshBasicMaterial({color: 0x303c49}),
     trim: new THREE.MeshStandardMaterial({color: 0x9cb9cb, roughness: .8})
   };
@@ -60,16 +64,27 @@
     for (const child of [...group.children]) { child.geometry?.dispose(); group.remove(child); }
   }
   function updateRoom() {
-    if (geometryKey === roomLayout) return;
-    roomLayout = geometryKey;
+    const layout = geometryKey + profile.boxScene + JSON.stringify(profile.scene);
+    if (layout === roomLayout) return;
+    roomLayout = layout;
     clear(room); clear(pattern);
     const w = profile.screen.width/100, h = profile.screen.height/100;
-    // Horizontal reach of the outer lit edges; the portal and room scale with it.
-    const outerX = Math.max(...pair.map(s => Math.max(Math.abs(s.pa[0]), Math.abs(s.pb[0]))));
-    const apertureX = outerX*1.13, apertureY = h*.46;
-    const frameZ = .025, thickness = .025;
-    const halfWidth = outerX*1.7, back = -Math.max(w*2, .65), front = frameZ-thickness/2;
-    const floorY = -apertureY, ceiling = h*.85, depth = front-back;
+    (profile.boxScene === 'open' ? openBox : cutBox)(w, h);
+    light.position.set(-w*.65,h*.65,w*1.8);
+    light.target.position.set(0,-h*.12,-w*.45); scene.add(light.target);
+    const reach = Math.max(w*2,h*1.5);
+    Object.assign(light.shadow.camera, {left:-reach,right:reach,top:reach,bottom:-reach,near:.01,far:reach*5});
+    light.shadow.camera.updateProjectionMatrix(); light.shadow.normalBias = .001;
+    buildPattern(bounds.right, bounds.back, bounds.floor, bounds.ceiling);
+  }
+  // Open box (UX §4.1 Scene, scene 1): the opening is the box's inside face and
+  // the black portal frame sits on it, so the panda can float outside.
+  function openBox(w, h) {
+    const { boxWidth, boxHeight, boxForward } = profile.scene;
+    const apertureX = boxWidth/200, apertureY = boxHeight/200;
+    const front = boxForward/100, thickness = .025, frameZ = front+thickness/2;
+    const halfWidth = apertureX, back = front-Math.max(w*2, .65);
+    const floorY = -apertureY, ceiling = apertureY, depth = front-back;
     Object.assign(bounds, { left: -halfWidth, right: halfWidth, back, front, floor: floorY, ceiling });
     roomBox('room-back-wall', [halfWidth*2, ceiling-floorY, .025], [0,(ceiling+floorY)/2,back-.0125], roomMaterials.back);
     roomBox('room-left-wall', [.025,ceiling-floorY,depth], [-halfWidth-.0125,(ceiling+floorY)/2,(front+back)/2], roomMaterials.left);
@@ -96,12 +111,66 @@
     shape.holes.push(hole);
     const frameTrim = new THREE.Mesh(new THREE.ShapeGeometry(shape),roomMaterials.edge);
     frameTrim.name = 'portal-trim'; frameTrim.position.z = frameZ+thickness/2+.001; room.add(frameTrim);
-    light.position.set(-w*.65,h*.65,w*1.8);
-    light.target.position.set(0,-h*.12,-w*.45); scene.add(light.target);
-    const reach = Math.max(w*2,h*1.5);
-    Object.assign(light.shadow.camera, {left:-reach,right:reach,top:reach,bottom:-reach,near:.01,far:reach*5});
-    light.shadow.camera.updateProjectionMatrix(); light.shadow.normalBias = .001;
-    buildPattern(halfWidth, back, floorY, ceiling);
+  }
+  // Cut box (UX §4.1 Scene, scene 2): the two screen planes cut an upright box
+  // from top to bottom and only the part behind both planes is drawn. The cut
+  // lies in the screen planes, so its folded-hexagon outline stays fixed on the
+  // screens for every eye position; walls, floor and ceiling behind it are 3D.
+  function cutBox(w, h) {
+    const { cutWidth, cutHeight, cutDepth } = profile.scene;
+    const a = cutWidth/200, floorY = -cutHeight/200, ceiling = cutHeight/200, back = -cutDepth/100, height = ceiling-floorY;
+    // The screens' inner edges (the gap) and the z where a screen plane passes |x|.
+    const tan = Math.tan(profile.screen.angle*Math.PI/360);
+    const innerZ = Math.min(...pair.flatMap(s => [s.pa[2], s.pb[2]])), innerX = innerZ*tan;
+    const cutZ = x => Math.max(Math.abs(x)/tan, innerZ), sideZ = cutZ(a);
+    Object.assign(bounds, { left: -a, right: a, back, front: sideZ, floor: floorY, ceiling });
+    // Floor and ceiling: the box's footprint with the V cut out of its front.
+    const outline = innerX < a ? [[-a,back],[a,back],[a,sideZ],[innerX,innerZ],[-innerX,innerZ],[-a,sideZ]]
+      : [[-a,back],[a,back],[a,innerZ],[-a,innerZ]];
+    for (const [name, y, sign, material] of [['room-floor', floorY, -1, roomMaterials.floor], ['room-ceiling', ceiling, 1, roomMaterials.back]]) {
+      const shape = new THREE.Shape(outline.map(([x, z]) => new THREE.Vector2(x, sign*z)));
+      const mesh = new THREE.Mesh(new THREE.ShapeGeometry(shape), material);
+      mesh.name = name; mesh.rotation.x = sign*Math.PI/2; mesh.position.y = y; mesh.receiveShadow = true; room.add(mesh);
+    }
+    roomBox('room-back-wall', [a*2, height, .025], [0,(ceiling+floorY)/2,back-.0125], roomMaterials.back);
+    roomBox('room-left-wall', [.025,height,sideZ-back], [-a-.0125,(ceiling+floorY)/2,(sideZ+back)/2], roomMaterials.left);
+    roomBox('room-right-wall', [.025,height,sideZ-back], [a+.0125,(ceiling+floorY)/2,(sideZ+back)/2], roomMaterials.right);
+    // Floor seams, clipped to the cut so none pokes out in front of a screen.
+    for (const x of [-.66,-.33,.33,.66].map(f => f*a)) {
+      const z1 = cutZ(x); roomBox('floor-seam', [.0015,.001,z1-back], [x,floorY+.0005,(z1+back)/2], roomMaterials.trim);
+    }
+    for (let i=1;i<=5;i++) {
+      const z = back+i*(sideZ-back)/6, from = z <= innerZ ? 0 : z*tan;
+      if (from >= a) continue;
+      if (from === 0) { roomBox('floor-seam', [a*2,.001,.0015], [0,floorY+.0005,z], roomMaterials.trim); continue; }
+      for (const sign of [-1,1]) roomBox('floor-seam', [a-from,.001,.0015], [sign*(a+from)/2,floorY+.0005,z], roomMaterials.trim);
+    }
+    roomBox('back-skirting', [a*2,h*.012,.006], [0,floorY+h*.006,back+.003], roomMaterials.trim);
+    for (const sign of [-1,1]) roomBox('side-skirting', [.006,h*.012,sideZ-back], [sign*(a-.003),floorY+h*.006,(sideZ+back)/2], roomMaterials.trim);
+    // Black mask on each screen around its half of the hexagon, with a thin rim.
+    for (const s of pair) {
+      const pa = new THREE.Vector3(...s.pa), across = new THREE.Vector3(...s.pb).sub(pa), up = new THREE.Vector3(...s.pc).sub(pa);
+      const len = across.length(), tall = up.length(), paOuter = Math.abs(s.pa[0]) > Math.abs(s.pb[0]);
+      const clamp = (v, max) => Math.max(0, Math.min(max, v));
+      // Along the screen: u where |x| = a (x is linear in u).
+      const uA = clamp((Math.sign(s.pa[0]+s.pb[0])*a-s.pa[0])/(s.pb[0]-s.pa[0])*len, len);
+      const [u0, u1] = paOuter ? [uA, len] : [0, uA];
+      const v0 = clamp(floorY-s.pa[1], tall), v1 = clamp(ceiling-s.pa[1], tall);
+      const basis = new THREE.Matrix4().makeBasis(across.clone().normalize(), up.clone().normalize(), across.clone().cross(up).normalize());
+      const rect = (name, ua, ub, va, vb, material, lift, order) => {
+        if (ub-ua < 1e-4 || vb-va < 1e-4) return;
+        const mesh = new THREE.Mesh(new THREE.PlaneGeometry(ub-ua, vb-va), material);
+        mesh.name = name; mesh.renderOrder = order; mesh.applyMatrix4(new THREE.Matrix4().makeTranslation((ua+ub)/2, (va+vb)/2, lift).premultiply(basis));
+        mesh.position.add(pa); room.add(mesh);
+      };
+      rect('cut-mask', 0, len, 0, v0, roomMaterials.mask, .001, 1); rect('cut-mask', 0, len, v1, tall, roomMaterials.mask, .001, 1);
+      rect('cut-mask', 0, u0, v0, v1, roomMaterials.mask, .001, 1); rect('cut-mask', u1, len, v0, v1, roomMaterials.mask, .001, 1);
+      const rim = .004;
+      if (v0 > 0) rect('cut-rim', u0, u1, Math.max(0, v0-rim), v0, roomMaterials.rim, .002, 2);
+      if (v1 < tall) rect('cut-rim', u0, u1, v1, Math.min(tall, v1+rim), roomMaterials.rim, .002, 2);
+      if (u0 > 0) rect('cut-rim', Math.max(0, u0-rim), u0, v0, v1, roomMaterials.rim, .002, 2);
+      if (u1 < len) rect('cut-rim', u1, Math.min(len, u1+rim), v0, v1, roomMaterials.rim, .002, 2);
+    }
   }
   // Alignment test pattern (UX §4.2): straight lines that must look straight
   // and continuous across both screens from the calibrated eye.
@@ -152,7 +221,7 @@
     }
     return fitModel(group);
   }
-  function showModel(model) { person.clear(); person.add(model); }
+  function showModel(model) { model.traverse(node => { node.renderOrder = 3; }); person.clear(); person.add(model); }
   let modelRequest = 0;
   function loadGltf(url, onDone, label) {
     if (!THREE.GLTFLoader) { status('GLTFLoader unavailable. Check your connection and reload.'); return; }
@@ -168,6 +237,13 @@
     else { modelRequest++; showModel(primitive(id)); }
   }
   setModel(profile.model);
+  // Box scene (UX §4.1 Scene): cut box or open box; only its own sliders show.
+  function showBoxScene() {
+    $('box-scene').value = profile.boxScene;
+    $('cut-box-controls').hidden = profile.boxScene !== 'cut'; $('open-box-controls').hidden = profile.boxScene !== 'open';
+  }
+  $('box-scene').onchange = event => { profile.boxScene = event.target.value; showBoxScene(); };
+  showBoxScene();
   $('model-select').value = profile.model;
   $('model-select').onchange = event => {
     const id = event.target.value;
@@ -183,9 +259,10 @@
   function danceTime() {
     return state.danceOffset + (state.dancePlaying ? Math.max(0, Date.now()-state.danceEpoch)/1000 : 0);
   }
-  function pandaScale() { return Math.min(profile.screen.height/100*.31, profile.screen.width/100*.48); }
+  // Automatic size from the screens, times the Scene panda scale.
+  function pandaScale() { return Math.min(profile.screen.height/100*.31, profile.screen.width/100*.48)*profile.scene.pandaScale/100; }
   function animatePanda() {
-    person.position.set(0, 0, state.depth);
+    person.position.set(0, 0, profile.scene.pandaForward/100);
     person.scale.setScalar(pandaScale());
     // Gentle float; paused with P.
     if (person.children[0]) person.children[0].rotation.z = Math.sin(danceTime()*1.2)*.03;
@@ -213,10 +290,10 @@
   }
   $('setup-toggle').onclick = () => setSetupOpen(!$('setup').classList.contains('open'));
 
-  const DETECTOR_NAMES = { 'two-stage': 'Face Mesh + zoom search', fullframe: 'Face Mesh only', landmarker: 'Face Landmarker' };
+  const DETECTOR_NAMES = { 'two-stage': 'Face Mesh + zoom search', fullframe: 'Face Mesh only', landmarker: 'Face Landmarker', 'depth-rgb': 'depth-rgb' };
   function renderProfileCard() {
     const s = profile.screen, when = profile.calibratedAt ? new Date(profile.calibratedAt).toLocaleString() : null;
-    const camera = trackingSession?.stream ? (trackingReference ? 'tracking, calibrated' : 'tracking, not calibrated') : 'not running';
+    const camera = measured() ? 'depth-rgb, measured distance' : trackingSession?.stream ? (trackingReference ? 'tracking, calibrated' : 'tracking, not calibrated') : 'not running';
     $('profile-card').innerHTML = (hasSavedProfile && when
       ? `Last calibrated <b>${when}</b>`
       : 'No saved calibration yet. Use <b>Manual measurement</b>.')
@@ -237,6 +314,15 @@
     $('seam-value').value = `${profile.screen.seamSplit}%`;
     const o = profile.advanced.overlap;
     $('overlap-value').value = o === 0 ? '0% · exact' : `${o > 0 ? '+' : ''}${o.toFixed(1)}%`;
+    const sc = profile.scene;
+    $('panda-scale-value').value = `${sc.pandaScale}%`;
+    $('panda-forward-value').value = `${sc.pandaForward > 0 ? '+' : ''}${sc.pandaForward} cm`;
+    $('box-width-value').value = `${sc.boxWidth} cm`;
+    $('box-height-value').value = `${sc.boxHeight} cm`;
+    $('box-forward-value').value = `${sc.boxForward > 0 ? '+' : ''}${sc.boxForward} cm`;
+    $('cut-width-value').value = `${sc.cutWidth} cm`;
+    $('cut-height-value').value = `${sc.cutHeight} cm`;
+    $('cut-depth-value').value = `${sc.cutDepth} cm`;
   }
   function syncOuterDistance() {
     const s = profile.screen;
@@ -266,8 +352,6 @@
   });
   $('outer-distance').addEventListener('change', () => { syncOuterDistance(); invalidateTracking(); });
   $('test-pattern').onchange = event => { state.testPattern = event.target.checked; };
-  $('model-depth').oninput = event => { state.depth = Number(event.target.value)/100; $('model-depth-value').value = `${event.target.value} cm`; };
-  $('model-depth-value').value = `${$('model-depth').value} cm`;
   function togglePause() {
     state.danceOffset = danceTime(); state.danceEpoch = Date.now(); state.dancePlaying = !state.dancePlaying;
     $('toggle-dance').textContent = state.dancePlaying ? 'Pause motion · P' : 'Resume motion · P';
@@ -316,7 +400,7 @@
     if (!file) return;
     try {
       const next = RoomProfile.sanitize(JSON.parse(await file.text()));
-      Object.assign(profile, next); derive(); fillInputs(); invalidateTracking(); $('detector-select').value = profile.detector; $('model-select').value = profile.model; setModel(profile.model);
+      Object.assign(profile, next); derive(); fillInputs(); invalidateTracking(); $('detector-select').value = profile.detector; $('model-select').value = profile.model; setModel(profile.model); showBoxScene();
       status('Profile imported. Check the values, then Apply.');
     } catch { status('Could not read that file as a profile JSON.'); }
   };
@@ -329,7 +413,7 @@
     setSetupOpen(false);
     if (!trackingSession) startTracking();
     if (trackingReference) saveTracking();
-    autoCalibrate = !trackingReference;
+    autoCalibrate = !trackingReference && !measured();
     if (autoCalibrate && calibrateTracking()) autoCalibrate = false;
     if (autoCalibrate) status(`Sit ${$('camera-distance-slider').value} cm from the webcam and hold still: calibrating…`);
     else status(hasSavedProfile ? 'Applied and saved.' : 'Applied (this browser could not save the profile).');
@@ -359,6 +443,13 @@
   let trackingSession, trackingReference, trackingTarget, trackingSamples = [], lastSeen = 0;
   let smoothingTime = performance.now(), fpsCount = 0, fps = 0, fpsTime = performance.now(), trackingError = '';
   function webcamPose() { return RoomProfile.cameraPose(profile); }
+  // depth-rgb measures the distance, so there is no eye calibration to do.
+  function measured() { return !!trackingSession?.depthRgb; }
+  // Which webcam (and resolution) a calibration was taken with.
+  function cameraKey() {
+    const track = trackingSession?.stream?.getVideoTracks()[0], s = track?.getSettings();
+    return track ? `${track.label}|${s.width}x${s.height}` : '';
+  }
   function eyeValid(eye) {
     return eye && [eye.x,eye.y,eye.z].every(Number.isFinite) && Math.max(Math.abs(eye.x),Math.abs(eye.y),Math.abs(eye.z)) < 10
       && ConcaveGeometry.inFront(eye, pair, .03);
@@ -372,9 +463,11 @@
     if (old) {
       cancelAnimationFrame(old.frame);
       old.stream?.getTracks().forEach(track => track.stop());
+      old.source?.close(); clearTimeout(old.retry);
       Promise.resolve(old.inFlight).catch(() => {}).then(() => old.detector?.close()).catch(() => {});
     }
     $('video').srcObject = null; $('video').hidden = true; lastSeen = 0; invalidateTracking();
+    $('depth-preview').hidden = true; $('depth-preview').removeAttribute('src'); $('camera-distance-slider').disabled = false;
   }
   async function refreshTrackingDevices() {
     try {
@@ -399,17 +492,19 @@
     const saved = savedTracking(), ref = saved?.reference;
     if ((saved?.detector || 'two-stage') !== profile.detector) return;
     if (!ref?.pose || JSON.stringify(ref.pose) !== JSON.stringify(webcamPose())) return;
+    if (ref.camera !== cameraKey()) return; // iris sizes from another camera do not transfer
     if (![ref.x, ref.y, ref.iris, ref.aspect, ref.eye?.x, ref.eye?.y, ref.eye?.z].every(Number.isFinite)) return;
     trackingReference = ref; trackingTarget = {...ref.eye};
   }
   async function startTracking() {
-    stopTracking(); restoreTracking();
+    stopTracking();
     const active = {}; trackingSession = active; trackingError = '';
+    if (profile.detector === 'depth-rgb') { startDepthRgb(active); return; }
     status('Starting webcam…');
     try {
       if (!window.FaceMesh) throw Error('Tracking library unavailable. Check your connection and restart webcam.');
       if (!navigator.mediaDevices?.getUserMedia) throw Error('Webcam requires localhost or HTTPS.');
-      const video = { width: {ideal: 1920}, height: {ideal: 1080} };
+      const video = { width: {ideal: 2560}, height: {ideal: 1440} }; // more iris pixels = steadier distance
       if (profile.trackingDeviceId) video.deviceId = { exact: profile.trackingDeviceId };
       let stream;
       try { stream = await navigator.mediaDevices.getUserMedia({video, audio: false}); }
@@ -419,6 +514,7 @@
       }
       if (trackingSession !== active) { stream.getTracks().forEach(t => t.stop()); return; }
       active.stream = stream; trackingDeviceId = stream.getVideoTracks()[0].getSettings().deviceId || '';
+      restoreTracking();
       refreshTrackingDevices();
       const element = $('video'); element.srcObject = stream; await element.play();
       if (trackingSession !== active) return;
@@ -445,7 +541,11 @@
         lastSeen = now; fpsCount++;
         trackingSamples.push({...sample, time: now}); trackingSamples = trackingSamples.filter(s => now-s.time < 3000).slice(-36);
         $('calibrate').disabled = trackingSamples.length < 12;
-        const eye = trackingReference ? PortraitTracking.estimate(sample, trackingReference)
+        const dt = Math.max(0, (now-(active.lastEyeTime || now))/1000); active.lastEyeTime = now;
+        if (!steady || steady.level !== profile.advanced.steadiness) steady = {level: profile.advanced.steadiness,
+          filter: PortraitTracking.createSteadyFilter(profile.advanced.steadiness), iris: PortraitTracking.createIrisFilter(profile.advanced.steadiness)};
+        // Distance comes from the iris size: steady it before it becomes a 3D position.
+        const eye = trackingReference ? PortraitTracking.estimate({...sample, iris: steady.iris.apply(sample.iris, dt)}, trackingReference)
           : PortraitTracking.eyeFromSample(sample, webcamPose(), Number($('camera-distance-slider').value)/100);
         if (!eye) {
           // Out of the usable range (or a glitch): keep the calibration and hold the last position.
@@ -453,8 +553,6 @@
           invalidateTracking(); return;
         }
         if (!eyeValid(eye)) { trackingTarget = null; return; }
-        const dt = Math.max(0, (now-(active.lastEyeTime || now))/1000); active.lastEyeTime = now;
-        if (!steady || steady.level !== profile.advanced.steadiness) steady = {level: profile.advanced.steadiness, filter: PortraitTracking.createSteadyFilter(profile.advanced.steadiness)};
         trackingTarget = steady.filter.apply(eye, dt);
         if (autoCalibrate && trackingSamples.length >= 12 && calibrateTracking()) { autoCalibrate = false; return; }
         status(trackingReference ? 'Tracking live · calibrated.' : trackingSamples.length < 12
@@ -534,11 +632,54 @@
       status(trackingError + '. Fix it, then press Restart webcam (R).');
     }
   }
+  // depth-rgb (UX §4.2): eye positions measured by tools/depth_rgb_bridge.py
+  // (colour + depth on the Orbbec Femto Bolt); the browser opens no webcam.
+  const DEPTH_RGB_URL = 'http://localhost:8766';
+  function startDepthRgb(active) {
+    active.depthRgb = true; $('calibrate').disabled = true; $('camera-distance-slider').disabled = true;
+    status('Connecting to the depth-rgb helper…');
+    const preview = $('depth-preview');
+    const connect = () => {
+      if (trackingSession !== active) return;
+      const source = active.source = new EventSource(`${DEPTH_RGB_URL}/events`);
+      source.onopen = () => {
+        if (trackingSession !== active) return;
+        trackingError = ''; preview.src = `${DEPTH_RGB_URL}/preview.mjpg?${Date.now()}`; preview.hidden = false;
+        status('depth-rgb connected. Finding eyes…');
+      };
+      source.onmessage = event => handleDepthRgb(active, JSON.parse(event.data));
+      source.onerror = () => {
+        source.close();
+        if (trackingSession !== active) return;
+        preview.hidden = true; preview.removeAttribute('src'); trackingTarget = null;
+        trackingError = 'depth-rgb helper not running';
+        status('depth-rgb helper not running: start bash tools/run_depth_rgb.sh, then press Restart webcam (R). Retrying…');
+        active.retry = setTimeout(connect, 2000);
+      };
+    };
+    connect();
+  }
+  function handleDepthRgb(active, message) {
+    if (trackingSession !== active || !message) return;
+    const now = performance.now();
+    if (!message.eye) {
+      if (now-lastSeen > 600) status(message.faces ? 'Face found but the irises are unclear.' : 'No face found. Face the camera.');
+      return;
+    }
+    const eye = PortraitTracking.eyeFromCamera(message.eye, webcamPose());
+    if (!eyeValid(eye)) { trackingTarget = null; status('Eyes found, but not in front of both screens. Check the camera pose fields.'); return; }
+    lastSeen = now; fpsCount++;
+    const dt = Math.max(0, (now-(active.lastEyeTime || now))/1000); active.lastEyeTime = now;
+    if (!steady || steady.level !== profile.advanced.steadiness) steady = {level: profile.advanced.steadiness, filter: PortraitTracking.createSteadyFilter(profile.advanced.steadiness)};
+    trackingTarget = steady.filter.apply(eye, dt);
+    const sources = Object.values(message.eyes || {}).map(e => e.source).join(' + ');
+    status(`Tracking live · depth-rgb (${sources}${message.depth ? '' : ', waiting for depth'}).`);
+  }
   $('restart-camera').onclick = startTracking;
   function calibrateTracking() {
-    if (!trackingSession || performance.now()-lastSeen > 300) return false;
+    if (!trackingSession || measured() || performance.now()-lastSeen > 300) return false;
     const next = ConcaveTracking.calibrate(trackingSamples, {pose: webcamPose()});
-    if (next) next.eye = PortraitTracking.eyeFromSample(next, next.pose, Number($('camera-distance-slider').value)/100);
+    if (next) { next.eye = PortraitTracking.eyeFromSample(next, next.pose, Number($('camera-distance-slider').value)/100); next.camera = cameraKey(); }
     if (!next || !eyeValid(next.eye)) {
       status('Hold still with your eyes in front of both screens; check the webcam placement and distance.'); return false;
     }
@@ -572,7 +713,7 @@
     lastLive = now;
     const pose = webcamPose(), eye = state.eye, fresh = trackingSession?.stream && lastSeen && now-lastSeen < 500;
     $('live-distance').innerHTML = fresh
-      ? `Eye → webcam ${fmt(Math.hypot(eye.x-pose.x, eye.y-pose.y, eye.z-pose.z))} cm<small>seam ${fmt(Math.hypot(eye.x, eye.z))} cm · ${trackingReference ? 'calibrated' : 'NOT calibrated (distance fixed)'} · L hides</small>`
+      ? `Eye → webcam ${fmt(Math.hypot(eye.x-pose.x, eye.y-pose.y, eye.z-pose.z))} cm<small>seam ${fmt(Math.hypot(eye.x, eye.z))} cm · ${trackingReference ? 'calibrated' : measured() ? 'depth-rgb (measured)' : 'NOT calibrated (distance fixed)'} · L hides</small>`
       : 'No face tracked<small>L hides</small>';
   }
   function updateDebug(now) {
@@ -580,7 +721,7 @@
     lastDebug = now;
     const pose = webcamPose(), eye = state.eye, fresh = trackingSession?.stream && lastSeen && now-lastSeen < 500;
     RoomMiniView.draw($('miniview'), { pair, pose, eye: trackingTarget || trackingReference ? eye : null, trail: state.trail,
-      room: bounds, panda: { z: state.depth, radius: pandaScale()*.35 } }, state.miniMode);
+      room: bounds, panda: { z: profile.scene.pandaForward/100, radius: pandaScale()*.35 } }, state.miniMode);
     const s = profile.screen, c = profile.trackingCamera;
     const tags = [
       `θ <b>${s.angle.toFixed(1)}°</b>`, `gap <b>${s.gap} cm</b>`, `<b>${s.width} × ${s.height} cm</b>`, `offset <b>${s.vOffset} cm</b>`,
@@ -588,7 +729,7 @@
       `eye <b>${fmt(eye.x)} / ${fmt(eye.y)} / ${fmt(eye.z)} cm</b>`,
       `→ seam <b>${fmt(Math.hypot(eye.x, eye.z))} cm</b>`, `→ cam <b>${fmt(Math.hypot(eye.x-pose.x, eye.y-pose.y, eye.z-pose.z))} cm</b>`,
       `<b>${fresh ? fps.toFixed(0) : 0} fps</b>`, `age <b>${lastSeen ? Math.round(now-lastSeen) : '—'} ms</b>`,
-      `calibrated <b>${trackingReference ? 'yes' : 'no'}</b>`,
+      `calibrated <b>${trackingReference ? 'yes' : measured() ? 'depth-rgb (measured)' : 'no'}</b>`,
       `profile <b>${profile.calibratedAt ? new Date(profile.calibratedAt).toLocaleTimeString() : 'unsaved'}</b>`,
       state.miniMode !== 'both' ? `view <b>${state.miniMode}</b>` : ''
     ].filter(Boolean);
@@ -599,7 +740,7 @@
     else if (!fresh) warnings.push('Tracking lost: eyes not visible');
     for (const screen of pair) if (ConcaveGeometry.planeDistance(screen, eye) < .03) warnings.push(`Eye behind ${screen.name}-screen plane`);
     if (trackingSession?.stream && fresh && !trackingTarget) warnings.push('Eye outside supported area');
-    if (!trackingReference && fresh) warnings.push('Tracking not calibrated');
+    if (!trackingReference && !measured() && fresh) warnings.push('Tracking not calibrated');
     $('warnings').textContent = warnings.join(' · ');
     const pill = $('status-pill'), lost = trackingSession?.stream && !fresh;
     pill.hidden = !lost; if (lost) pill.textContent = 'Tracking lost: eyes not visible';
