@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+captures/
+*_detected.png
+.venv/
+Log/
+models/
