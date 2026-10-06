@@ -182,6 +182,65 @@ for this.
     second camera to measure the screens automatically."
 - **Manual measurement is the primary path**, and it alone is enough to run
   the full experience.
+- **Scene** section: a **Box** selector and sliders that change the 3D
+  scene live while you watch. The panda and its controls are the same in
+  both boxes.
+
+  | Control | Unit | Default | Range | Meaning |
+  |---|---|---|---|---|
+  | Box | — | Cut box | Cut box / Open box | Which box scene is shown (below). |
+  | Panda position | cm | 8 | −100 … 30 | Panda forward (+, toward you) or back (−, into the box) from the seam line. Saved in the profile (`scene.pandaForward`). |
+  | Panda scale | % | 100 | 10 … 300 | Size of the panda relative to its automatic size (which follows the screen size). |
+
+  **Cut box (default, scene 2).** The two screens cut a virtual box from
+  top to bottom, and you look into the part of the box that is left behind
+  the screens.
+
+  | Control | Unit | Default | Range | Meaning |
+  |---|---|---|---|---|
+  | Box width | cm | 40 | 10 … 300 | Horizontal inside width; the side walls are at ± half of it. |
+  | Box height | cm | 50 | 10 … 300 | Inside height, centred on the screen centre. |
+  | Box depth | cm | 60 | 10 … 300 | Back wall distance behind the seam line. |
+
+  - The cut lies **on the screen surfaces**. It is a folded hexagon across
+    both screens: top edge outer-left → seam → outer-right, the two outer
+    vertical edges, and the bottom edge back through the seam. Because it
+    lies in the screen planes, its edges stay at fixed places on the
+    screens for every eye position; only width and height move them.
+  - Behind the cut, the side walls, back wall, floor and ceiling (floor and
+    ceiling are notched where the screens cut them) are real 3D geometry
+    and update with the tracked eye, so the space reaches back behind the
+    screens.
+  - Outside the hexagon the screens are black (a mask drawn exactly on the
+    screen surfaces), so no outside face of the box is ever visible.
+  - The mask only hides the box, **never the panda**: a panda taller or
+    wider than the opening stays whole (on a concave pair its sides reach
+    behind the screen planes). The box walls still hide the panda normally
+    when it is moved into the box.
+  - If the width is wider than the screens reach, the cut simply ends at
+    the outer screen edges. Gap and screen angle are taken into account.
+
+  **Open box (scene 1, the previous box).**
+
+  | Control | Unit | Default | Range | Meaning |
+  |---|---|---|---|---|
+  | Box width | cm | 54 | 10 … 300 | Inside width of the box (the room). |
+  | Box height | cm | 55 | 10 … 300 | Inside height of the box, centred on the screen centre. |
+  | Box position | cm | −10 | −100 … 30 | Where the open front of the box sits: 0 = seam line, + toward you, − away. |
+
+  - The box is a real open-front box: its front opening is the same size as
+    its inside, and the black frame around the opening moves with it. Box
+    depth stays automatic (2 × screen width, at least 65 cm).
+  - Defaults put the box opening 10 cm behind the seam line and the panda
+    8 cm in front of it, so the **panda floats outside the box**.
+
+  Only the sliders of the selected box are shown. The box choice
+  (`boxScene`: `cut` / `open`), panda scale and all box values are stored in
+  the profile (`scene.pandaScale`, `scene.cutWidth`, `scene.cutHeight`,
+  `scene.cutDepth`, `scene.boxWidth`, `scene.boxHeight`, `scene.boxForward`),
+  saved on **Apply** and included in Export / Import. Out-of-range or unknown
+  values in an imported profile fall back to the defaults. The debug
+  mini-view shows the box outline and panda size.
 - Footer: **Apply & start experience**.
 
 ### 4.2 Manual measurement
@@ -205,10 +264,34 @@ Sections, top to bottom:
      Face Landmarker on the same crop. Needs internet to load its model; if
      it fails to load the status line says so and the previous detector is
      used.
+   - **depth-rgb (Orbbec Femto Bolt)**: fuses the colour and depth cameras
+     (algorithm from `sub-features/femto_bolt_charuco/iris_depth.py`).
+     MediaPipe finds the irises in the colour image; the depth image is
+     reprojected into the colour camera with the factory calibration and
+     the measured depth at each iris centre gives the distance. Where depth
+     is missing or implausible on an eye (the cornea is shiny), that eye
+     falls back to the iris-size distance with the camera's factory focal
+     length. The eye point is the midpoint of both irises.
+     - Runs in a local helper, not the browser (the browser cannot read the
+       depth camera): `bash tools/run_depth_rgb.sh` starts
+       `tools/depth_rgb_bridge.py` on `http://localhost:8766`. The helper
+       owns the camera, so the browser does not open a webcam in this mode;
+       the camera dropdown is ignored.
+     - **No eye-distance calibration**: the distance is measured in mm. The
+       eyes → lens slider and **Calibrate tracking** are disabled, and the
+       status / debug strip read "depth-rgb (measured)" instead of
+       "not calibrated". Only the camera pose fields (above top, forward,
+       tilt, yaw, left/right) still matter. FOV is not used.
+     - **Preview**: the eye-calibration area shows the helper's live
+       colour image with the iris circles and the depth / source (depth or
+       size) of each eye, instead of the webcam video.
+     - If the helper is not running, status says "depth-rgb helper not
+       running: start bash tools/run_depth_rgb.sh, then press Restart webcam
+       (R)". It retries automatically every 2 s.
    Changing the detector restarts tracking and discards the eye calibration
    (iris sizes differ slightly per detector), so recalibrate afterwards. The
    choice is saved in the profile (`detector`: `two-stage`, `fullframe`,
-   `landmarker`). The Home status card shows the active detector.
+   `landmarker`, `depth-rgb`). The Home status card shows the active detector.
 3. **Foreground model:** a dropdown for the object floating in front of
    the seam. Options: **Panda** (default, `models/panda.glb`), **Cube**
    (edged cube, good for judging perspective), **Sphere** (checker pattern)
@@ -310,6 +393,19 @@ values.
   but slightly slower to follow, 0 = almost no filtering. Saved in the
   profile (`advanced.steadiness`). It runs before the existing smoothing
   time; lower the smoothing time if the picture feels laggy.
+- **Distance steadiness:** distance comes from the iris size in pixels,
+  which is much noisier than the left/right/up/down position (an iris is only
+  a few dozen pixels wide, less with a wide-angle camera). So the iris size
+  gets its own, stronger speed-adaptive filter *before* the eye position is
+  computed: the distance holds still while you sit still and follows when you
+  really lean in or back. The same **Steadiness (%)** setting controls it.
+- **Capture resolution:** the webcam is requested at 2560 × 1440 (falls back
+  to the best the camera offers). More pixels across the iris = steadier
+  distance, which matters most with wide-angle cameras.
+- **Changing the webcam:** a saved eye calibration is only restored for the
+  same camera (name and resolution). After switching cameras the app asks for
+  a new calibration. Also enter the new camera's **Horiz. FOV** (e.g. Orbbec
+  Femto Bolt colour camera, 16:9: 80°) before calibrating.
 - **Span both screens** button (Home view, Scene section, key **F**): uses
   the Window Management API (`getScreenDetails`, asks the browser's
   permission once) to find the bounding box of all monitors, then moves and
